@@ -1,10 +1,13 @@
 import { NavLink, Route, Routes } from 'react-router-dom';
+import { lazy, Suspense } from 'react';
 import Home from './pages/Home';
-import Play from './pages/Play';
-import Analyze from './pages/Analyze';
-import Teacher from './pages/Teacher';
-import Engines from './pages/Engines';
-import Profile from './pages/Profile';
+
+// Pages chargées à la demande (recharts, contenu des leçons… ne pèsent pas sur l'accueil)
+const Play = lazy(() => import('./pages/Play'));
+const Analyze = lazy(() => import('./pages/Analyze'));
+const Teacher = lazy(() => import('./pages/Teacher'));
+const Engines = lazy(() => import('./pages/Engines'));
+const Profile = lazy(() => import('./pages/Profile'));
 import ThemeToggle from './components/ThemeToggle';
 
 const NAV = [
@@ -32,6 +35,7 @@ export default function App() {
         <ThemeToggle />
       </header>
       <main className="content">
+        <Suspense fallback={<p className="muted"><span className="spinner" /> Chargement…</p>}>
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/play" element={<Play />} />
@@ -40,6 +44,7 @@ export default function App() {
           <Route path="/engines" element={<Engines />} />
           <Route path="/profile" element={<Profile />} />
         </Routes>
+        </Suspense>
       </main>
       <footer className="footer">Moteur : Stockfish 17.1 (WASM, GPLv3) · Données : API publique chess.com</footer>
     </div>
