@@ -1,0 +1,6 @@
+/* Styles propres aux pages, un fichier par zone (le socle est dans ../base.css). */
+@import './home.css';
+@import './play.css';
+@import './lessons.css';
+@import './engines.css';
+@import './stats.css';

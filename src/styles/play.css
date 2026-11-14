@@ -1,0 +1,38 @@
+/* === Play/Analyze === */
+.expl { display: flex; flex-direction: column; gap: 0.5rem; }
+.expl-title { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.04em; }
+.expl-head { display: flex; align-items: center; gap: 0.5rem; }
+.expl-san { font-family: var(--mono); font-weight: 700; font-size: 1.15rem; }
+.expl-headline { margin: 0; font-weight: 600; }
+.expl-group ul { margin: 0.3rem 0 0; padding-left: 1.1rem; }
+.expl-point { padding: 0.2rem 0.35rem; border-radius: 6px; cursor: pointer; margin: 0.15rem 0; }
+.expl-point:hover, .expl-point.pinned { background: var(--surface-2); }
+.expl-point.pinned { box-shadow: inset 3px 0 0 var(--accent); }
+.expl-plan { cursor: pointer; }
+.expl-plan p { margin: 0.3rem 0; }
+.expl-alts h4 { margin: 0.4rem 0 0.2rem; font-size: 0.95rem; }
+.expl-alt { border: 1px solid var(--border); border-radius: 8px; padding: 0.35rem 0.6rem; margin: 0.3rem 0; background: var(--surface); }
+.expl-alt summary { cursor: pointer; }
+.expl-alt p { margin: 0.35rem 0; }
+.expl .mono { overflow-wrap: anywhere; }
+
+.play-status { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; margin-bottom: 0.5rem; min-height: 1.8rem; }
+.play-status-text { display: inline-flex; align-items: center; gap: 0.4rem; }
+.play-status-text.done { font-weight: 600; color: var(--accent); }
+.play-side, .analyze-side { display: flex; flex-direction: column; gap: 0.75rem; }
+.play-field { display: flex; flex-direction: column; gap: 0.35rem; margin-bottom: 0.8rem; }
+.play-range-legend { display: flex; justify-content: space-between; font-size: 0.8rem; }
+.play-toggle { display: flex; gap: 0.4rem; align-items: baseline; margin-top: 0.8rem; font-weight: 400; font-size: 0.92rem; }
+
+.analyze-engine-head { display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem; }
+.analyze-engine-head h3 { margin: 0; }
+.engine-lines { list-style: none; padding: 0; margin: 0.5rem 0 0; display: flex; flex-direction: column; gap: 0.3rem; }
+.engine-line {
+  display: flex; gap: 0.5rem; align-items: baseline; width: 100%; text-align: left; font: inherit; color: var(--text);
+  background: var(--surface-2); border: 1px solid transparent; border-radius: 8px; padding: 0.35rem 0.5rem; cursor: pointer;
+}
+.engine-line:hover { border-color: var(--border); }
+.engine-line.selected { border-color: var(--accent); }
+.engine-line .mono { overflow-wrap: anywhere; font-size: 0.85rem; }
+.analyze-hint { font-size: 0.85rem; margin: 0.4rem 0 0; }
+.analyze-error { color: var(--bad); margin: 0.3rem 0 0; }

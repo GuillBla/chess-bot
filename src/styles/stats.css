@@ -1,0 +1,115 @@
+/* === Stats/MyGames === */
+/* Couleurs des graphiques (palette catégorielle validée, déclinée clair/sombre). */
+:root {
+  --viz-1: #2a78d6;
+  --viz-2: #eb6834;
+  --viz-3: #1baf7a;
+  --viz-4: #eda100;
+  --viz-win: #0ca30c;
+  --viz-draw: #b5b3ab;
+  --viz-loss: #d03b3b;
+  --viz-grid: #e1e0d9;
+  --viz-axis: #6f6d67;
+  --viz-axis-line: #c3c2b7;
+  --viz-hover: rgba(11, 11, 11, 0.05);
+  --viz-eval-fill: rgba(42, 120, 214, 0.14);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --viz-1: #3987e5;
+    --viz-2: #d95926;
+    --viz-3: #199e70;
+    --viz-4: #c98500;
+    --viz-draw: #a8a69e;
+    --viz-loss: #e05252;
+    --viz-grid: #2f2e2a;
+    --viz-axis: #a19d92;
+    --viz-axis-line: #45433d;
+    --viz-hover: rgba(255, 255, 255, 0.06);
+    --viz-eval-fill: rgba(57, 135, 229, 0.2);
+  }
+}
+:root[data-theme='dark'] {
+  --viz-1: #3987e5;
+  --viz-2: #d95926;
+  --viz-3: #199e70;
+  --viz-4: #c98500;
+  --viz-draw: #a8a69e;
+  --viz-loss: #e05252;
+  --viz-grid: #2f2e2a;
+  --viz-axis: #a19d92;
+  --viz-axis-line: #45433d;
+  --viz-hover: rgba(255, 255, 255, 0.06);
+  --viz-eval-fill: rgba(57, 135, 229, 0.2);
+}
+
+.viz-card { min-width: 0; }
+.viz-card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
+.viz-card-head h3 { margin: 0; }
+.viz-sub { margin: 0.1rem 0 0; font-size: 0.85rem; }
+.viz-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap: 1rem; }
+.viz-legend { display: flex; flex-wrap: wrap; gap: 0.3rem 1rem; font-size: 0.85rem; color: var(--muted); margin-bottom: 0.4rem; }
+.viz-legend-item { display: inline-flex; align-items: center; gap: 0.4rem; }
+.viz-swatch { width: 10px; height: 10px; border-radius: 3px; display: inline-block; flex-shrink: 0; }
+.viz-tooltip {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px; box-shadow: var(--shadow);
+  padding: 0.45rem 0.6rem; font-size: 0.85rem; color: var(--text); min-width: 140px;
+}
+.viz-tooltip-title { font-weight: 600; margin-bottom: 0.2rem; }
+.viz-tooltip-row { display: flex; align-items: center; gap: 0.4rem; }
+.viz-tooltip-label { color: var(--muted); flex: 1; }
+.viz-tooltip-value { font-variant-numeric: tabular-nums; font-weight: 600; }
+.recharts-wrapper text { font-family: var(--font); }
+
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; flex-wrap: wrap; }
+.seg button { background: var(--surface); color: var(--muted); border: none; padding: 0.3rem 0.7rem; font: inherit; font-size: 0.88rem; cursor: pointer; }
+.seg button + button { border-left: 1px solid var(--border); }
+.seg button:hover { color: var(--text); background: var(--surface-2); }
+.seg button.active { background: var(--accent); color: var(--accent-contrast); }
+
+.stats-userform { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.stats-userform input { max-width: 220px; }
+.stats-error { border-color: var(--bad); }
+.stats-progress { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; color: var(--muted); font-size: 0.9rem; }
+.stats-progress progress, .mg-progress progress { flex: 1; min-width: 120px; max-width: 320px; accent-color: var(--accent); }
+.stats-filter { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+.stats-header { display: flex; flex-direction: column; gap: 1rem; }
+.stats-identity { display: flex; gap: 1rem; align-items: center; }
+.stats-identity h2 { margin: 0; }
+.stats-identity p { margin: 0.2rem 0 0; font-size: 0.9rem; }
+.stats-avatar { width: 72px; height: 72px; border-radius: 12px; object-fit: cover; flex-shrink: 0; background: var(--surface-2); }
+.stats-avatar-empty { display: grid; place-items: center; font-size: 2rem; }
+.stat-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0.75rem; }
+.stat-tile { background: var(--surface-2); border-radius: 8px; padding: 0.6rem 0.8rem; }
+.stat-tile-label { font-size: 0.8rem; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; }
+.stat-tile-value { font-size: 1.7rem; font-weight: 700; line-height: 1.2; }
+.stat-tile-meta { display: flex; flex-direction: column; font-size: 0.8rem; color: var(--muted); }
+.stats-insights { margin: 0; padding-left: 1.2rem; display: flex; flex-direction: column; gap: 0.3rem; }
+.stats-table td.num, .stats-table th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.meter { position: relative; min-width: 90px; height: 18px; background: var(--surface-2); border-radius: 4px; overflow: hidden; }
+.meter-fill { position: absolute; inset: 0 auto 0 0; background: color-mix(in srgb, var(--viz-1) 45%, transparent); border-radius: 4px; }
+.meter-label { position: relative; font-size: 0.78rem; font-weight: 600; padding-left: 0.4rem; font-variant-numeric: tabular-nums; line-height: 18px; }
+
+/* Analyse de mes parties */
+.mg-toolbar { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; }
+.mg-toolbar select { width: auto; }
+.mg-progress { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; font-size: 0.9rem; color: var(--muted); }
+.mg-games td { vertical-align: middle; }
+.mg-games tr.current td { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.mg-result { font-weight: 700; }
+.mg-nav { display: flex; gap: 0.35rem; flex-wrap: wrap; align-items: center; }
+.mg-acc { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.6rem; }
+.mg-acc .stat-tile.me { outline: 2px solid var(--accent); }
+.mg-counts { display: grid; grid-template-columns: auto auto auto; gap: 0.15rem 0.8rem; font-size: 0.9rem; }
+.mg-counts .num { text-align: right; font-variant-numeric: tabular-nums; }
+.mg-key { border-left: 3px solid var(--border); padding-left: 0.7rem; margin: 0.6rem 0; }
+.mg-key.blunder, .mg-key.miss { border-left-color: var(--bad); }
+.mg-key.mistake { border-left-color: var(--warn); }
+.mg-key-head { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
+.mg-cats { display: flex; flex-wrap: wrap; gap: 0.3rem; margin: 0.3rem 0; }
+.mg-moves { max-height: 220px; }
+.mg-moves button.bad { color: var(--bad); font-weight: 700; }
+.mg-moves button.warn { color: var(--warn); font-weight: 700; }
+.mg-moves button.current { color: var(--accent-contrast); }
+.mg-rec { display: flex; flex-direction: column; gap: 0.3rem; }
+.mg-rec a { font-weight: 600; }
