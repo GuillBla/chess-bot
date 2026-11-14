@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { BoardPreview } from '../components/VariationLine';
 import { useNavigate } from 'react-router-dom';
 import { Chess, type Square } from 'chess.js';
 import Board from '../components/Board';
@@ -127,6 +128,9 @@ export default function Play() {
   const moves = game?.moves ?? [];
   const { chess, fens, sans } = useMemo(() => replay(moves), [moves]);
   const fen = fens[fens.length - 1];
+  // Aperçu d'une variation (plan, alternatives) : position simulée sur l'échiquier, effacée dès que la vraie position change.
+  const [preview, setPreview] = useState<BoardPreview | null>(null);
+  useEffect(() => setPreview(null), [fen]);
   const turn = chess.turn();
   const over = game ? gameOverText(chess, game.player) : null;
   const finished = !!over || !!game?.result;
@@ -457,7 +461,7 @@ export default function Play() {
               <EvalBar whiteCp={evalLine ? whiteScore(evalLine.line, evalLine.turn) : 0} label={evalLine ? formatScore(evalLine.line, evalLine.turn) : '…'} orientation={boardOrientation} />
             )}
             <div className="board-row-main">
-              <Board fen={fen} orientation={boardOrientation} onMove={game && playerTurn ? onMove : undefined} arrows={arrows} marks={marks} lastMove={last} badge={badge} id="play-board" maxWidth={760} />
+              <Board preview={preview} fen={fen} orientation={boardOrientation} onMove={game && playerTurn ? onMove : undefined} arrows={arrows} marks={marks} lastMove={last} badge={badge} id="play-board" maxWidth={760} />
             </div>
           </div>
           {playerCard(topSide === 'w' ? 'b' : 'w')}
@@ -505,6 +509,7 @@ export default function Play() {
               {notice && !helpLoading && <p className="muted">{notice}</p>}
               {explanation && !helpLoading && (
                 <ExplanationPanel
+                onPreview={setPreview}
                   title={explanation.title}
                   explanation={explanation.ex}
                   cls={explanation.cls}

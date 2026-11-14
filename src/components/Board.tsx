@@ -42,6 +42,8 @@ export interface BoardProps {
   maxWidth?: number;
   /** Sons à chaque nouveau coup (défaut : oui, selon la préférence utilisateur). */
   sound?: boolean;
+  /** Position simulée (exploration d'une variation) : affiche un bandeau « Aperçu » et bloque les coups. */
+  preview?: { fen: string; lastMove: { from: string; to: string }; label: string; step: number; total: number } | null;
   /** Cadre en bois autour de l'échiquier (défaut : oui). */
   framed?: boolean;
   id?: string;
@@ -64,7 +66,18 @@ export default function Board({
   sound = true,
   framed = true,
   id = 'board',
+  preview = null,
 }: BoardProps) {
+  // Pendant un aperçu de variation, on affiche la position simulée (sans flèches, sans son, sans coups possibles).
+  if (preview) {
+    fen = preview.fen;
+    lastMove = preview.lastMove;
+    arrows = [];
+    marks = [];
+    badge = null;
+    onMove = undefined;
+    sound = false;
+  }
   const prefs = usePreferences();
   const innerRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(400);
@@ -80,19 +93,20 @@ export default function Board({
   }, []);
 
   // Son au changement de coup (uniquement quand le dernier coup change réellement)
-  const prev = useRef<{ fen: string; key: string } | null>(null);
+  const prev = useRef<{ fen: string; key: string; preview: boolean } | null>(null);
   useEffect(() => {
     const key = lastMove ? `${lastMove.from}${lastMove.to}` : '';
     const before = prev.current;
-    prev.current = { fen, key };
-    if (!sound || !before || !lastMove || before.fen === fen || before.key === key) return;
+    prev.current = { fen, key, preview: !!preview };
+    // pas de son en entrant / sortant d'un aperçu de variation
+    if (!sound || !before || before.preview || !lastMove || before.fen === fen || before.key === key) return;
     try {
       const c = new Chess(fen);
       playSound(soundForTransition(before.fen, fen, c.inCheck(), c.isGameOver()));
     } catch {
       /* FEN invalide : pas de son */
     }
-  }, [fen, lastMove, sound]);
+  }, [fen, lastMove, sound, preview]);
 
   const squareStyles: Record<string, CSSProperties> = {};
   if (lastMove) {
@@ -114,7 +128,18 @@ export default function Board({
 
   return (
     <div className="board-wrap" style={{ maxWidth }}>
-      <div className={framed ? 'board-frame' : 'board-frame bare'}>
+      <div className={`${framed ? 'board-frame' : 'board-frame bare'}${preview ? ' previewing' : ''}`}>
+        {preview && (
+          <div className="board-preview-tag" role="status">
+            <span className="board-preview-eye" aria-hidden>
+              Aperçu
+            </span>
+            <span className="board-preview-move">{preview.label}</span>
+            <span className="board-preview-step">
+              {preview.step}/{preview.total}
+            </span>
+          </div>
+        )}
         <div ref={innerRef} style={{ position: 'relative' }}>
           <Chessboard
             id={id}

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import type { BoardPreview } from '../components/VariationLine';
 import { useLocation } from 'react-router-dom';
 import { Chess, validateFen, type Square } from 'chess.js';
 import Board from '../components/Board';
@@ -106,6 +107,9 @@ export default function Analyze() {
 
   const { fens, sans, ucis } = useMemo(() => replay(source.startFen, line), [source.startFen, line]);
   const fen = fens[Math.min(ply, fens.length - 1)];
+  // Aperçu d'une variation (plan, alternatives) : position simulée sur l'échiquier, effacée dès que la vraie position change.
+  const [preview, setPreview] = useState<BoardPreview | null>(null);
+  useEffect(() => setPreview(null), [fen]);
   const turn = turnOfFen(fen);
   const inGame = ply > 0 && ply <= source.game.length && line.slice(0, ply).every((u, i) => u === source.game[i]);
   const diverged = line.length !== source.game.length || line.some((u, i) => u !== source.game[i]);
@@ -308,7 +312,7 @@ export default function Analyze() {
           <div className="board-row">
             <EvalBar whiteCp={evalCp} label={evalLabel} orientation={orientation} />
             <div className="board-row-main">
-              <Board fen={fen} orientation={orientation} onMove={onMove} arrows={arrows} marks={focus.marks} lastMove={lastMove} badge={badge} id="analyze-board" maxWidth={760} />
+              <Board preview={preview} fen={fen} orientation={orientation} onMove={onMove} arrows={arrows} marks={focus.marks} lastMove={lastMove} badge={badge} id="analyze-board" maxWidth={760} />
             </div>
           </div>
           <div className="toolbar" role="toolbar" aria-label="Navigation dans la partie">
@@ -437,6 +441,7 @@ export default function Analyze() {
           {playedEx && (
             <div className="card">
               <ExplanationPanel
+                onPreview={setPreview}
                 title="Coup joué dans la partie"
                 explanation={playedEx}
                 cls={playedCls}
@@ -449,6 +454,7 @@ export default function Analyze() {
           {shownEx && !gameStatus && (
             <div className="card">
               <ExplanationPanel
+                onPreview={setPreview}
                 title={selectedEx ? `Ligne ${selected + 1} : ce que vise ce coup` : `Meilleur coup${live?.done ? '' : ' (analyse en cours)'}`}
                 explanation={shownEx}
                 fenBefore={fen}

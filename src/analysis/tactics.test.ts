@@ -135,6 +135,19 @@ describe('explainMove', () => {
     expect(ex.headline).toMatch(/Gaffe|Erreur/);
   });
 
+  it('fournit des variations rejouables (plan et alternatives)', () => {
+    const ex = explainMove(fen, 'd5c7', analysis);
+    const seqs = [ex.plan?.seq, ...ex.alternatives.map((a) => a.seq)];
+    for (const seq of seqs) {
+      expect(seq).toBeDefined();
+      expect(seq!.fen).toBe(fen);
+      const c = new Chess(seq!.fen);
+      for (const u of seq!.uci) expect(() => c.move({ from: u.slice(0, 2), to: u.slice(2, 4), promotion: u[4] })).not.toThrow();
+    }
+    expect(ex.plan!.seq!.uci[0]).toBe('d5c7');
+    expect(ex.alternatives[0].seq!.uci[0]).toBe('d5f6');
+  });
+
   it('coup illégal', () => {
     expect(explainMove(fen, 'a1a2', analysis).headline).toMatch(/pas légal/);
   });

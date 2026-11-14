@@ -7,7 +7,7 @@
 
 import { Chess, type Move } from 'chess.js';
 import type { AnalysisResult, EngineLine, StockfishEngine } from '../engine/stockfish';
-import type { AlternativeExplanation, BoardArrow, ExplanationPoint, MoveExplanation, SquareMark } from './types';
+import type { AlternativeExplanation, BoardArrow, ExplanationPoint, MoveExplanation, MoveSequence, SquareMark } from './types';
 import { formatLine, formatScore, parseUci, playUci, pvToSan } from '../lib/chessUtils';
 import { extractFeatures, opp, type PositionFeatures, type SideFeatures } from './features';
 import {
@@ -271,6 +271,7 @@ function newThreats(fen: string, fenAfter: string): Threat[] {
 interface PlanResult {
   line: string;
   text: string;
+  seq: MoveSequence;
 }
 
 function walk(fen: string, pv: string[]): Move[] {
@@ -341,7 +342,7 @@ function planFor(fen: string, pv: string[], evalLine: Pick<EngineLine, 'cp' | 'm
     const sign = turn === 'w' ? 1 : -1;
     text += ` Évaluation : ${formatScore(evalLine, turn)} (${describeEval(sign * (evalLine.cp ?? 0), evalLine.mate === null ? null : sign * evalLine.mate)}).`;
   }
-  return { line: formatLine(fen, pv.slice(0, n), n), text };
+  return { line: formatLine(fen, pv.slice(0, n), n), text, seq: { fen, uci: pv.slice(0, n) } };
 }
 
 // --------------------------------------------------------------------------
@@ -560,6 +561,7 @@ export function explainMove(
       san: bestSan,
       lossCp: 0,
       line: formatLine(fen, best.pv, 8),
+      seq: { fen, uci: best.pv.slice(0, 8) },
       text: `Le meilleur coup était ${bestSan}${idea ? `, qui ${idea}` : ''}.${bestReply ? ` Après ${bestReply}, la suite donne ${formatScore(best, c)}` : ` Évaluation : ${formatScore(best, c)}`} contre ${evalText} pour ${move.san}.`,
     });
   }
@@ -588,7 +590,7 @@ export function explainMove(
       }
       text = `${altSan} ${idea}${why ? `, ${why}` : ''}. C’est moins précis : environ ${pawnsText(altLoss)} de moins que ${isBest ? move.san : bestSan} (${formatScore(l, c)}).`;
     }
-    alternatives.push({ uci: l.pv[0], san: altSan, lossCp: altLoss, line: formatLine(fen, l.pv, 8), text });
+    alternatives.push({ uci: l.pv[0], san: altSan, lossCp: altLoss, line: formatLine(fen, l.pv, 8), seq: { fen, uci: l.pv.slice(0, 8) }, text });
   }
 
   return { uci, san: move.san, evalText, headline: capital(headline.replace(/\s+/g, ' ').trim()), points, plan, alternatives };

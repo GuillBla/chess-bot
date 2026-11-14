@@ -280,3 +280,35 @@ th { background: var(--surface-2); font-weight: 600; }
   position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px;
   overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
 }
+
+/* Aperçu d'une variation sur l'échiquier */
+.board-frame.previewing { box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.35), 0 0 0 3px var(--brass), var(--shadow); }
+.board-preview-tag {
+  position: absolute; z-index: 6; top: 0; left: 50%; transform: translate(-50%, -55%);
+  display: inline-flex; align-items: center; gap: 0.5rem; white-space: nowrap;
+  padding: 0.15rem 0.65rem; border-radius: 999px; background: var(--brass); color: var(--brass-text);
+  font-size: 0.8rem; font-weight: 700; box-shadow: var(--shadow); pointer-events: none;
+}
+.board-preview-eye { font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase; }
+.board-preview-move { font-family: var(--mono); }
+.board-preview-step { font-family: var(--mono); font-weight: 500; opacity: 0.75; }
+
+/* Variation interactive (plan, alternatives) */
+.varline { display: flex; align-items: flex-start; gap: 0.45rem; margin-top: 0.45rem; }
+.varline-play {
+  flex-shrink: 0; display: grid; place-items: center; width: 26px; height: 26px; margin-top: 1px;
+  border-radius: 50%; border: 1px solid var(--border); background: var(--surface); color: var(--accent); cursor: pointer;
+}
+.varline-play:hover, .varline-play.on { background: var(--brass); color: var(--brass-text); border-color: var(--brass); }
+.varline-moves { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.1rem 0.15rem; font-family: var(--mono); font-size: 0.86rem; min-width: 0; }
+.varline-item { display: inline-flex; align-items: baseline; gap: 0.1rem; }
+.varline-num { color: var(--muted); padding-left: 0.3rem; }
+.varline-move {
+  font: inherit; color: var(--text); background: none; border: 1px solid transparent; border-radius: 4px;
+  padding: 0.05rem 0.3rem; cursor: pointer;
+}
+.varline-move:hover, .varline-move.active { background: color-mix(in srgb, var(--brass) 30%, transparent); }
+.varline-move.pinned { background: var(--brass); color: var(--brass-text); }
+.varline-reset { flex-shrink: 0; margin-left: auto; border: none; background: none; color: var(--muted); cursor: pointer; font-size: 0.85rem; padding: 0.2rem; }
+.varline-reset:hover { color: var(--text); }
+.varline-hint { margin: 0.25rem 0 0; font-size: 0.8rem; color: var(--muted); font-style: italic; }

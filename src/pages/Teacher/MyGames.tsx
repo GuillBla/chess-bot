@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import type { BoardPreview } from '../../components/VariationLine';
 import { Link, Route, Routes, useNavigate, useParams } from 'react-router-dom';
 import { Area, AreaChart, CartesianGrid, ReferenceDot, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import type { Square } from 'chess.js';
@@ -612,6 +613,10 @@ function GameView({ ctx }: { ctx: Ctx }) {
     return () => window.removeEventListener('keydown', onKey);
   }, [goto, ply, n]);
 
+  // Aperçu d'une variation (plan, alternatives) : position simulée sur l'échiquier, effacée dès que la vraie position change.
+  const [preview, setPreview] = useState<BoardPreview | null>(null);
+  useEffect(() => setPreview(null), [ply, pgn]);
+
   if (!parsed || !pgn) {
     return (
       <div className="page">
@@ -724,7 +729,7 @@ function GameView({ ctx }: { ctx: Ctx }) {
           <div className="mg-board-row">
             <EvalBar whiteCp={evalCp} label={review ? fmtEval(evalCp) : '?'} orientation={playerColor} />
             <div className="mg-board">
-              <Board
+              <Board preview={preview}
                 fen={fen}
                 orientation={playerColor}
                 lastMove={lastMove}
@@ -850,6 +855,7 @@ function GameView({ ctx }: { ctx: Ctx }) {
                       )}
                       {on && m.explanation && (
                         <ExplanationPanel
+                onPreview={setPreview}
                           explanation={m.explanation}
                           cls={m.cls}
                           fenBefore={m.fenBefore}

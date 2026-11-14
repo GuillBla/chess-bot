@@ -3,6 +3,7 @@ import type { Square } from 'chess.js';
 import type { BoardArrow, ExplanationPoint, MoveExplanation, SquareMark } from '../analysis/types';
 import { MOVE_CLASS_LABELS, type MoveClass } from '../analysis/classify';
 import { BADGE_SYMBOLS, moveNumberLabel } from './play/moveClass';
+import VariationLine, { type BoardPreview } from './VariationLine';
 
 export interface ExplanationPanelProps {
   explanation: MoveExplanation;
@@ -16,6 +17,8 @@ export interface ExplanationPanelProps {
   cls?: MoveClass | null;
   /** Position AVANT le coup : sert à afficher le numéro (« 16. Qb8+ » / « 16… Nf6 »). */
   fenBefore?: string;
+  /** Si fourni, les variations (plan, alternatives) deviennent rejouables : survoler un coup montre la position simulée. */
+  onPreview?: (p: BoardPreview | null) => void;
 }
 
 const CATEGORY: Record<ExplanationPoint['category'], { label: string; cls: string }> = {
@@ -58,7 +61,7 @@ function Block({ title, children }: { title: string; children: ReactNode }) {
  * Explication d'un coup en trois temps : en-tête (coup, éval, classification), idée principale,
  * puis des blocs fixes (ce que fait le coup, ce que ça menace, plan, pourquoi pas…).
  */
-export default function ExplanationPanel({ explanation: ex, onFocusArrows, title, hideAlternatives, cls, fenBefore }: ExplanationPanelProps) {
+export default function ExplanationPanel({ explanation: ex, onFocusArrows, title, hideAlternatives, cls, fenBefore, onPreview }: ExplanationPanelProps) {
   const [pinned, setPinned] = useState<{ key: string; arrows: BoardArrow[]; marks: SquareMark[] } | null>(null);
   useEffect(() => setPinned(null), [ex]);
   const moveArrow: BoardArrow = { from: ex.uci.slice(0, 2) as Square, to: ex.uci.slice(2, 4) as Square, kind: 'good' };
@@ -137,9 +140,17 @@ export default function ExplanationPanel({ explanation: ex, onFocusArrows, title
         <Block title="Plan">
           {planPoints.length > 0 && renderPoints(planPoints, 'plan', false)}
           {ex.plan && (
-            <div className={`expl-plan expl-point${pinned?.key === 'plan' ? ' pinned' : ''}`} {...focusable('plan', [moveArrow])}>
-              <p className="expl-point-text">{ex.plan.text}</p>
-              {ex.plan.line && <p className="expl-line">{ex.plan.line}</p>}
+            <div className="expl-plan-wrap">
+              <div className={`expl-plan expl-point${pinned?.key === 'plan' ? ' pinned' : ''}`} {...focusable('plan', [moveArrow])}>
+                <p className="expl-point-text">{ex.plan.text}</p>
+                {ex.plan.line && !(onPreview && ex.plan.seq) && <p className="expl-line">{ex.plan.line}</p>}
+              </div>
+              {onPreview && ex.plan.seq && (
+                <>
+                  <VariationLine seq={ex.plan.seq} onPreview={onPreview} className="expl-varline" />
+                  <p className="varline-hint">Survole les coups pour les voir sur l’échiquier, ou ▶ pour rejouer la séquence.</p>
+                </>
+              )}
             </div>
           )}
         </Block>
@@ -162,7 +173,11 @@ export default function ExplanationPanel({ explanation: ex, onFocusArrows, title
                     <span className={`badge ${lossTone(a.lossCp)}`}>{lossText(a.lossCp)}</span>
                   </summary>
                   <p>{a.text}</p>
-                  {a.line && <p className="expl-line">{a.line}</p>}
+                  {onPreview && a.seq ? (
+                    <VariationLine seq={a.seq} onPreview={onPreview} className="expl-varline" />
+                  ) : (
+                    a.line && <p className="expl-line">{a.line}</p>
+                  )}
                 </details>
               );
             })}
