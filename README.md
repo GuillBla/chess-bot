@@ -40,4 +40,5 @@ npm run build    # build de production dans dist/
 
 ## Licence
 
-Stockfish est distribué sous licence GPLv3 ; ce projet l'embarque tel quel.
+Ce projet est distribué sous licence **GNU GPL v3 ou ultérieure** (voir [`LICENSE`](LICENSE)).
+Il embarque [Stockfish](https://stockfishchess.org/) 17.1 (WebAssembly, via le paquet npm `stockfish`), lui-même sous GPLv3 ; son code source est disponible sur https://github.com/official-stockfish/Stockfish.
