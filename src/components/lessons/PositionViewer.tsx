@@ -3,7 +3,8 @@ import { Chess, type Square } from 'chess.js';
 import Board from '../Board';
 import { parseUci } from '../../lib/chessUtils';
 import type { PositionSection } from '../../content/lessons/types';
-import { RichText } from './RichText';
+import MoveText from '../MoveText';
+import type { BoardPreview } from '../VariationLine';
 import { NavIcon, TurnIndicator, splitSource } from './book';
 
 interface Step {
@@ -63,10 +64,16 @@ export default function PositionViewer({ section, id, number }: Props) {
   const steps = useMemo(() => buildSteps(section.fen, section.moves ?? []), [section]);
   const rows = useMemo(() => sheetRows(steps), [steps]);
   const [i, setI] = useState(0); // 0 = position de départ, k = après le k-ième coup
+  // Coups cités dans le commentaire : aperçu sur l'échiquier du diagramme
+  const [preview, setPreview] = useState<BoardPreview | null>(null);
+  const mainline = useMemo(() => (section.moves ?? []).map((m) => m.uci), [section]);
   const step = i > 0 ? steps[i - 1] : null;
   const { title, source } = splitSource(section.title);
 
-  const go = (k: number) => setI(Math.max(0, Math.min(steps.length, k)));
+  const go = (k: number) => {
+    setPreview(null);
+    setI(Math.max(0, Math.min(steps.length, k)));
+  };
   const onKey = (e: KeyboardEvent) => {
     if (e.key === 'ArrowRight') go(i + 1);
     else if (e.key === 'ArrowLeft') go(i - 1);
@@ -96,6 +103,7 @@ export default function PositionViewer({ section, id, number }: Props) {
           marks={step ? [] : section.marks ?? []}
           lastMove={step ? { from: step.from, to: step.to } : null}
           maxWidth={460}
+          preview={preview}
         />
         <figcaption id={`${id}-cap`} className="diagram-caption">
           <span className="diagram-num">Diagramme {number}</span>
@@ -109,7 +117,7 @@ export default function PositionViewer({ section, id, number }: Props) {
           {step ? <span className="diagram-move mono">{stepLabel(step)}</span> : <TurnIndicator fen={section.fen} />}
         </p>
         <p className="diagram-text" aria-live="polite">
-          <RichText text={step ? moves[i - 1].comment : section.caption} />
+          <MoveText text={step ? moves[i - 1].comment : section.caption} startFen={section.fen} mainline={mainline} onPreview={setPreview} />
         </p>
 
         {steps.length > 0 && (

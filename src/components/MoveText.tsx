@@ -1,15 +1,38 @@
-import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
+import Board from './Board';
+import { START_FEN } from '../lib/chessUtils';
 import { findMoves, frenchPlyLabel, sanToFrench, type MoveRef } from '../lib/frenchMoves';
 import type { BoardPreview } from './VariationLine';
+
+export interface MoveContext {
+  fen: string;
+  mainline?: string[];
+}
 
 export interface MoveTextProps {
   /** Texte avec `**gras**` et `*italique*`, coups en notation française. */
   text: string;
   /** Position à partir de laquelle les coups du texte se rejouent. */
-  startFen: string;
+  startFen?: string;
   /** Ligne principale (UCI), utilisée quand le texte saute directement à un coup plus loin. */
   mainline?: string[];
-  onPreview: (p: BoardPreview | null) => void;
+  /** Plusieurs positions de départ possibles : on garde celle qui rend le plus de coups jouables. */
+  contexts?: MoveContext[];
+  /** Position simulée à afficher sur l'échiquier voisin. Absent : un petit échiquier apparaît sous le coup survolé. */
+  onPreview?: (p: BoardPreview | null) => void;
+}
+
+const NO_LINE: string[] = [];
+
+/** Choisit la position de départ qui explique le plus de coups du texte. */
+function resolve(text: string, contexts: MoveContext[], standalone: boolean) {
+  let best = { fen: contexts[0]?.fen ?? START_FEN, refs: [] as MoveRef[] };
+  for (const c of contexts) {
+    const refs = findMoves(text, c.fen, c.mainline ?? NO_LINE, { standalone });
+    if (refs.length > best.refs.length) best = { fen: c.fen, refs };
+  }
+  return best;
 }
 
 function toPreview(ref: MoveRef, startFen: string): BoardPreview {
@@ -21,21 +44,57 @@ function toPreview(ref: MoveRef, startFen: string): BoardPreview {
  * Texte d'explication dont les coups (« 23.gxh4 Td2!! ») sont survolables :
  * la position correspondante s'affiche sur l'échiquier. Un clic garde la position affichée.
  */
-export default function MoveText({ text, startFen, mainline = [], onPreview }: MoveTextProps) {
-  const refs = useMemo(() => findMoves(text, startFen, mainline), [text, startFen, mainline]);
+export default function MoveText({ text, startFen: fixedFen, mainline = NO_LINE, contexts, onPreview }: MoveTextProps) {
+  const { fen: startFen, refs } = useMemo(
+    // Sans position imposée (paragraphe de leçon), un coup isolé sans numéro est une idée générale : pas de lien.
+    () => resolve(text, contexts ?? [{ fen: fixedFen ?? START_FEN, mainline }], !contexts),
+    [text, contexts, fixedFen, mainline],
+  );
   const [pinned, setPinned] = useState<number | null>(null);
   const [active, setActive] = useState<number | null>(null);
+  // Mode « bulle » : petit échiquier positionné sous le coup survolé
+  const popover = !onPreview;
+  const [bubble, setBubble] = useState<{ preview: BoardPreview; style: CSSProperties } | null>(null);
+  const linkEls = useRef<(HTMLButtonElement | null)[]>([]);
 
   useEffect(() => {
     setPinned(null);
     setActive(null);
-    return () => onPreview(null);
+    setBubble(null);
+    return () => onPreview?.(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [text, startFen]);
 
+  // La bulle se ferme quand on fait défiler la page
+  useEffect(() => {
+    if (!popover || !bubble) return;
+    const close = () => {
+      setBubble(null);
+      setActive(null);
+      setPinned(null);
+    };
+    window.addEventListener('scroll', close, { passive: true, once: true });
+    return () => window.removeEventListener('scroll', close);
+  }, [popover, bubble]);
+
   const show = (i: number | null) => {
     setActive(i);
-    onPreview(i === null ? null : toPreview(refs[i], startFen));
+    const p = i === null ? null : toPreview(refs[i], startFen);
+    if (!popover) {
+      onPreview?.(p);
+      return;
+    }
+    const el = i === null ? null : linkEls.current[i];
+    if (!p || !el) {
+      setBubble(null);
+      return;
+    }
+    const r = el.getBoundingClientRect();
+    const size = Math.min(240, window.innerWidth - 32);
+    const left = Math.max(16, Math.min(r.left + r.width / 2 - size / 2, window.innerWidth - size - 16));
+    const below = window.innerHeight - r.bottom > size + 40;
+    const style: CSSProperties = below ? { left, top: r.bottom + 10, width: size } : { left, top: Math.max(8, r.top - size - 16), width: size };
+    setBubble({ preview: p, style });
   };
 
   // Découpe : segments markdown (gras / italique / texte) puis liens de coups à l'intérieur.
@@ -51,6 +110,7 @@ export default function MoveText({ text, startFen, mainline = [], onPreview }: M
       out.push(
         <button
           key={key++}
+          ref={(el) => (linkEls.current[i] = el)}
           type="button"
           className={`mv-link${r.threat ? ' threat' : ''}${active === i ? ' active' : ''}${pinned === i ? ' pinned' : ''}`}
           onMouseEnter={() => show(i)}
@@ -87,6 +147,14 @@ export default function MoveText({ text, startFen, mainline = [], onPreview }: M
   return (
     <span className="mv-text" onMouseLeave={() => show(pinned)}>
       {nodes}
+      {popover &&
+        bubble &&
+        createPortal(
+          <div className="mv-bubble" style={bubble.style} role="status">
+            <Board id="mv-bubble" fen={bubble.preview.fen} preview={bubble.preview} maxWidth={240} sound={false} />
+          </div>,
+          document.body,
+        )}
     </span>
   );
 }

@@ -323,3 +323,9 @@ th { background: var(--surface-2); font-weight: 600; }
 .mv-link.pinned { background: var(--brass); color: var(--brass-text); text-decoration-color: transparent; }
 .mv-link.threat { text-decoration-style: dashed; text-decoration-color: color-mix(in srgb, var(--bad) 70%, transparent); }
 .ex-varline { margin: 0.2rem 0 0.5rem; }
+.mv-bubble {
+  position: fixed; z-index: 40; display: block; pointer-events: none;
+  filter: drop-shadow(0 10px 24px rgba(0, 0, 0, 0.35));
+}
+.mv-bubble .board-frame { padding: 6px; }
+.mv-bubble .board-preview-tag { font-size: 0.7rem; }

@@ -3,7 +3,9 @@ import { Link } from 'react-router-dom';
 import type { Lesson } from '../../content/lessons/types';
 import PositionViewer from './PositionViewer';
 import ExercisePlayer from './ExercisePlayer';
-import { RichText } from './RichText';
+import MoveText, { type MoveContext } from '../MoveText';
+import { START_FEN } from '../../lib/chessUtils';
+import type { LessonSection } from '../../content/lessons/types';
 import { BASE, partLabel } from './book';
 import { markSolved, setLastLesson, solvedCount, useProgress } from './progress';
 
@@ -11,6 +13,18 @@ interface Props {
   lesson: Lesson;
   /** Catalogue complet : numérotation des chapitres et pages précédente/suivante. */
   lessons: Lesson[];
+}
+
+/** Positions de départ plausibles pour les coups cités dans un paragraphe : diagramme suivant, précédent, puis position initiale. */
+function contextsFor(sections: LessonSection[], i: number): MoveContext[] {
+  const ctx: MoveContext[] = [];
+  const add = (s: LessonSection | undefined) => {
+    if (s?.type === 'position') ctx.push({ fen: s.fen, mainline: (s.moves ?? []).map((m) => m.uci) });
+  };
+  add(sections.slice(i + 1).find((s) => s.type === 'position'));
+  add([...sections.slice(0, i)].reverse().find((s) => s.type === 'position'));
+  ctx.push({ fen: START_FEN });
+  return ctx;
 }
 
 /** Un chapitre, mis en page comme un livre d'échecs. */
@@ -62,7 +76,7 @@ export default function LessonView({ lesson, lessons }: Props) {
               {s.title && <h3>{s.title}</h3>}
               {s.paragraphs.map((p, k) => (
                 <p key={k} className={dropcap && k === 0 ? 'has-dropcap' : undefined}>
-                  <RichText text={p} />
+                  <MoveText text={p} contexts={contextsFor(lesson.sections, i)} />
                 </p>
               ))}
             </section>
