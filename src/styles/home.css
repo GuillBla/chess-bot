@@ -9,7 +9,7 @@
 .home-hero > * { min-width: 0; }
 .home-hero-text { display: grid; gap: 1rem; align-content: center; }
 .home-hero h1 {
-  font-size: clamp(2.4rem, 5.2vw, 4rem); font-weight: 800; line-height: 1.02; letter-spacing: -0.02em; margin: 0;
+  font-size: clamp(2.2rem, min(5.2vw, 8.5vh), 4rem); font-weight: 800; line-height: 1.02; letter-spacing: -0.02em; margin: 0;
 }
 .home-hero h1 em { font-style: italic; font-weight: 500; color: var(--accent); }
 .home-hero-lead { font-size: 1.18rem; color: var(--muted); max-width: 46ch; margin: 0; }
@@ -116,6 +116,35 @@
 .home-why-points { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 0.25rem 0.8rem; margin: 0.2rem 0 0; font-size: 0.93rem; }
 .home-why-points dt { font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); padding-top: 0.2rem; }
 .home-why-points dd { margin: 0; }
+
+/* ---------- Héros sur grand écran : tout tient dans la fenêtre ----------
+   L'échiquier est dimensionné sur la HAUTEUR disponible (bandeau, choix de partie, boutons de lecture déduits).
+   La figure de la partie vivante « s'ouvre » (display: contents) pour placer la fiche de commentaire
+   sous le texte d'accroche, à gauche, et garder à droite : choix de partie, échiquier, lecture. */
+@media (min-width: 901px) {
+  .home-hero {
+    --home-board: clamp(300px, calc(100vh - 215px), 600px);
+    grid-template-columns: minmax(0, 1fr) var(--home-board);
+    grid-template-areas:
+      'text  games'
+      'text  board'
+      'sheet board'
+      '.     controls';
+    grid-template-rows: auto auto 1fr auto;
+    gap: 0.7rem 3rem;
+    align-items: start;
+  }
+  @supports (height: 100dvh) {
+    .home-hero { --home-board: clamp(300px, calc(100dvh - 215px), 600px); }
+  }
+  .home-hero-board, .home-hero-board > .home-live { display: contents; }
+  .home-hero-text { grid-area: text; align-self: start; }
+  .home-live-games { grid-area: games; }
+  .home-hero .board-wrap { grid-area: board; width: var(--home-board); max-width: var(--home-board) !important; margin: 0; }
+  .home-live-controls { grid-area: controls; align-self: start; }
+  .home-hero .home-sheet { grid-area: sheet; align-self: end; }
+  .content:has(> .home) { padding-top: 1rem; }
+}
 
 /* ---------- Responsive ---------- */
 @media (max-width: 1100px) {
