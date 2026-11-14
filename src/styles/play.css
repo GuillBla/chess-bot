@@ -1,14 +1,39 @@
 /* === Jouer / Analyse (identité « Tournoi », ergonomie « salle d'analyse ») ===
    Couleurs uniquement via les tokens de base.css (clair + sombre « bois verni »). */
 
-/* ---------- Disposition ---------- */
-.board-layout.two-col { grid-template-columns: minmax(0, 640px) minmax(300px, 1fr); }
-.board-layout.two-col > * { min-width: 0; }
+/* ---------- Disposition ----------
+   L'échiquier (cadre compris) est un carré dont le côté dépend de la HAUTEUR disponible :
+   --board-size = hauteur de l'écran − ce qui est au-dessus et en dessous (bandeau, titre, cartes joueur).
+   Ainsi toute la zone de jeu tient à l'écran à l'arrivée sur la page, sans dézoomer. */
+.play-page, .analyze-page {
+  --board-reserve: 240px;               /* bandeau + titre compact + barre d'outils sous l'échiquier + marges */
+  --board-size: clamp(260px, calc(100vh - var(--board-reserve)), 760px);
+}
+@supports (height: 100dvh) {
+  .play-page, .analyze-page { --board-size: clamp(260px, calc(100dvh - var(--board-reserve)), 760px); }
+}
+.play-page.no-game { --board-reserve: 190px; }          /* avant la partie : pas de barre d'outils */
+.play-page:not(.no-game) { --board-reserve: 375px; }   /* + cartes Stockfish / Vous au-dessus et en dessous */
+@media (max-width: 720px) {
+  .play-page, .analyze-page { --board-reserve: 300px; }  /* + barre de navigation du bas */
+  .play-page.no-game { --board-reserve: 250px; }
+  .play-page:not(.no-game) { --board-reserve: 430px; }
+}
+
+.board-layout.two-col { display: flex; align-items: flex-start; gap: 1.25rem; }
+.board-layout.two-col > .board-col { flex: 0 1 auto; width: calc(var(--board-size) + 30px); max-width: 100%; min-width: 0; }
+.board-layout.two-col > .side-col { flex: 1 1 320px; min-width: 300px; }
+.play-page .board-row-main, .analyze-page .board-row-main { max-width: var(--board-size); }
 @media (max-width: 960px) {
-  .board-layout.two-col { grid-template-columns: minmax(0, 1fr); }
-  .board-layout.two-col > .board-col { width: 100%; max-width: 640px; justify-self: center; }
+  .board-layout.two-col { flex-direction: column; align-items: stretch; }
+  .board-layout.two-col > .board-col { align-self: center; width: min(100%, calc(var(--board-size) + 30px)); }
+  .board-layout.two-col > .side-col { flex: none; min-width: 0; width: 100%; }
   .play-page.no-game .board-layout > .side-col { order: -1; }
 }
+
+/* En-tête compact : le titre ne doit pas voler la place de l'échiquier */
+.play-page .page-head, .analyze-page .page-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0.2rem 0.9rem; margin-bottom: 0; }
+.play-page .page-head h1, .analyze-page .page-head h1 { font-size: 1.6rem; order: -1; }
 .play-side, .analyze-side { align-content: start; }
 
 .play-page .board-row, .analyze-page .board-row { display: flex; gap: 8px; align-items: stretch; min-width: 0; }
@@ -22,6 +47,7 @@
 .play-page .toolbar, .analyze-page .toolbar { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.5rem; }
 .play-page .toolbar-group, .analyze-page .toolbar-group { display: flex; flex-wrap: wrap; gap: 0.4rem; min-width: 0; }
 .analyze-page .nav-group .btn { min-width: 2.8rem; font-size: 0.85rem; }
+.play-page .toolbar .btn, .analyze-page .toolbar .btn { padding: 0.32rem 0.7rem; font-size: 0.88rem; }
 .play-page .btn-sm, .analyze-page .btn-sm { padding: 0.18rem 0.55rem; font-size: 0.82rem; }
 
 .sr-only-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }

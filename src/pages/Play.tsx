@@ -457,7 +457,7 @@ export default function Play() {
               <EvalBar whiteCp={evalLine ? whiteScore(evalLine.line, evalLine.turn) : 0} label={evalLine ? formatScore(evalLine.line, evalLine.turn) : '…'} orientation={boardOrientation} />
             )}
             <div className="board-row-main">
-              <Board fen={fen} orientation={boardOrientation} onMove={game && playerTurn ? onMove : undefined} arrows={arrows} marks={marks} lastMove={last} badge={badge} id="play-board" />
+              <Board fen={fen} orientation={boardOrientation} onMove={game && playerTurn ? onMove : undefined} arrows={arrows} marks={marks} lastMove={last} badge={badge} id="play-board" maxWidth={760} />
             </div>
           </div>
           {playerCard(topSide === 'w' ? 'b' : 'w')}

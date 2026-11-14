@@ -308,7 +308,7 @@ export default function Analyze() {
           <div className="board-row">
             <EvalBar whiteCp={evalCp} label={evalLabel} orientation={orientation} />
             <div className="board-row-main">
-              <Board fen={fen} orientation={orientation} onMove={onMove} arrows={arrows} marks={focus.marks} lastMove={lastMove} badge={badge} id="analyze-board" />
+              <Board fen={fen} orientation={orientation} onMove={onMove} arrows={arrows} marks={focus.marks} lastMove={lastMove} badge={badge} id="analyze-board" maxWidth={760} />
             </div>
           </div>
           <div className="toolbar" role="toolbar" aria-label="Navigation dans la partie">
