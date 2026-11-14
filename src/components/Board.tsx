@@ -135,9 +135,11 @@ export default function Board({
               Aperçu
             </span>
             <span className="board-preview-move">{preview.label}</span>
-            <span className="board-preview-step">
-              {preview.step}/{preview.total}
-            </span>
+            {preview.total > 0 && (
+              <span className="board-preview-step">
+                {preview.step}/{preview.total}
+              </span>
+            )}
           </div>
         )}
         <div ref={innerRef} style={{ position: 'relative' }}>

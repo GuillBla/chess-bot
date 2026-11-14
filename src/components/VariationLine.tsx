@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Chess } from 'chess.js';
 import type { MoveSequence } from '../analysis/types';
 import { parseUci } from '../lib/chessUtils';
+import { sanToFrench } from '../lib/frenchMoves';
 
 /** Position simulée affichée sur l'échiquier pendant l'exploration d'une variation. */
 export interface BoardPreview {
@@ -22,7 +23,7 @@ interface Step {
   preview: BoardPreview;
 }
 
-function buildSteps(seq: MoveSequence, max: number): Step[] {
+function buildSteps(seq: MoveSequence, max: number, french = false): Step[] {
   const chess = new Chess(seq.fen);
   const parts = seq.fen.split(' ');
   let moveNo = parseInt(parts[5] ?? '1', 10);
@@ -37,8 +38,9 @@ function buildSteps(seq: MoveSequence, max: number): Step[] {
       break;
     }
     const num = white ? `${moveNo}.` : i === 0 ? `${moveNo}…` : '';
-    const label = `${white ? `${moveNo}.` : `${moveNo}…`} ${m.san}`;
-    steps.push({ san: m.san, num, label, preview: { fen: chess.fen(), lastMove: { from: m.from, to: m.to }, label, step: i + 1, total: 0 } });
+    const san = french ? sanToFrench(m.san) : m.san;
+    const label = `${white ? `${moveNo}.` : `${moveNo}…`} ${san}`;
+    steps.push({ san, num, label, preview: { fen: chess.fen(), lastMove: { from: m.from, to: m.to }, label, step: i + 1, total: 0 } });
     if (!white) moveNo++;
     white = !white;
   }
@@ -52,14 +54,16 @@ export interface VariationLineProps {
   onPreview: (p: BoardPreview | null) => void;
   max?: number;
   className?: string;
+  /** Notation française (R, D, T, F, C) comme dans les leçons. */
+  french?: boolean;
 }
 
 /**
  * Variation interactive : survoler (ou toucher) un coup montre sur l'échiquier la position après ce coup,
  * comme si on rejouait la suite. Le bouton ▶ rejoue toute la séquence ; quitter la ligne rend la vraie position.
  */
-export default function VariationLine({ seq, onPreview, max = 12, className = '' }: VariationLineProps) {
-  const steps = useMemo(() => buildSteps(seq, max), [seq, max]);
+export default function VariationLine({ seq, onPreview, max = 12, className = '', french = false }: VariationLineProps) {
+  const steps = useMemo(() => buildSteps(seq, max, french), [seq, max, french]);
   const [active, setActive] = useState<number | null>(null);
   const [pinned, setPinned] = useState<number | null>(null);
   const [playing, setPlaying] = useState(false);

@@ -1,11 +1,13 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Chess, type Square } from 'chess.js';
 import Board from '../Board';
-import { formatLine, parseUci } from '../../lib/chessUtils';
+import { parseUci } from '../../lib/chessUtils';
 import { getAnalysisEngine, type EngineLine } from '../../engine/stockfish';
 import type { Exercise } from '../../content/lessons/types';
 import type { BoardArrow, SquareMark } from '../../analysis/types';
 import { RichText } from './RichText';
+import MoveText from '../MoveText';
+import VariationLine, { type BoardPreview } from '../VariationLine';
 import { TurnIndicator, splitSource } from './book';
 
 type Status = 'playing' | 'wrong' | 'checking' | 'solved' | 'alternative' | 'revealed';
@@ -47,6 +49,9 @@ export default function ExercisePlayer({ exercise, index, total, solvedBefore, o
   const [lastMove, setLastMove] = useState<{ from: string; to: string } | null>(null);
   const [wrongArrow, setWrongArrow] = useState<BoardArrow | null>(null);
   const [mistakes, setMistakes] = useState(0);
+  // Aperçu des coups cités dans la solution / l'explication (position simulée sur l'échiquier)
+  const [preview, setPreview] = useState<BoardPreview | null>(null);
+  const solutionSeq = useMemo(() => ({ fen: startFen, uci: solution }), [startFen, solution]);
   const timers = useRef<number[]>([]);
   const alive = useRef(true);
 
@@ -74,6 +79,7 @@ export default function ExercisePlayer({ exercise, index, total, solvedBefore, o
   function reset() {
     clearTimers();
     setFen(startFen);
+    setPreview(null);
     setPly(0);
     setStatus('playing');
     setMessage('');
@@ -232,6 +238,7 @@ export default function ExercisePlayer({ exercise, index, total, solvedBefore, o
             marks={marks}
             lastMove={lastMove}
             maxWidth={480}
+            preview={preview}
           />
         </div>
         <div className="ex-side">
@@ -257,7 +264,7 @@ export default function ExercisePlayer({ exercise, index, total, solvedBefore, o
               </span>
             </p>
           )}
-          {status === 'revealed' && <p className="ex-line mono">{formatLine(startFen, solution, solution.length)}</p>}
+          {status === 'revealed' && <VariationLine seq={solutionSeq} onPreview={setPreview} french className="ex-varline" />}
           <div className="btn-row ex-actions">
             {!done && (
               <>
@@ -276,10 +283,11 @@ export default function ExercisePlayer({ exercise, index, total, solvedBefore, o
           {done && (
             <div className="ex-explain">
               <h5>Explication</h5>
-              {status !== 'revealed' && <p className="ex-line mono">{formatLine(startFen, solution, solution.length)}</p>}
+              {status !== 'revealed' && <VariationLine seq={solutionSeq} onPreview={setPreview} french className="ex-varline" />}
               <p>
-                <RichText text={exercise.explanation} />
+                <MoveText text={exercise.explanation} startFen={startFen} mainline={solution} onPreview={setPreview} />
               </p>
+              <p className="varline-hint">Survole les coups (dans la ligne ou dans le texte) pour les voir sur l’échiquier.</p>
             </div>
           )}
           {footer}
