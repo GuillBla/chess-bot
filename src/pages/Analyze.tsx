@@ -299,7 +299,7 @@ export default function Analyze() {
 
   return (
     <div className="page analyze-page">
-      <header className="page-head">
+      <header className="page-head visually-hidden">
         <span className="eyebrow">Salle d’analyse</span>
         <h1>Analyse expliquée</h1>
       </header>

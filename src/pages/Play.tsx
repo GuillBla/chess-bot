@@ -445,7 +445,7 @@ export default function Play() {
 
   return (
     <div className={`page play-page${game ? '' : ' no-game'}`}>
-      <header className="page-head">
+      <header className={game ? 'page-head visually-hidden' : 'page-head'}>
         <span className="eyebrow">Partie d’entraînement</span>
         <h1>Jouer contre Stockfish</h1>
       </header>
@@ -461,6 +461,9 @@ export default function Play() {
             </div>
           </div>
           {playerCard(topSide === 'w' ? 'b' : 'w')}
+        </div>
+
+        <div className="side-col play-side">
           {game && resultText && (
             <div className="play-result" role="status">
               <span className="eyebrow">Partie terminée</span>
@@ -489,24 +492,6 @@ export default function Play() {
                   <span aria-hidden>⚑</span> Abandonner
                 </button>
               </div>
-            </div>
-          )}
-        </div>
-
-        <div className="side-col play-side">
-          {game ? (
-            <details className="card play-settings">
-              <summary>
-                <span className="play-settings-title">Nouvelle partie</span>
-                <span className="muted">Couleur, force du bot…</span>
-              </summary>
-              <div className="play-settings-body">{settings}</div>
-            </details>
-          ) : (
-            <div className="card play-settings">
-              <h3>Nouvelle partie</h3>
-              <p className="muted play-intro">Choisissez votre couleur et la force de Stockfish, puis lancez la partie. L’indice et l’explication de vos coups sont là pour apprendre.</p>
-              <div className="play-settings-body">{settings}</div>
             </div>
           )}
 
@@ -547,6 +532,22 @@ export default function Play() {
                   Analyser cette partie
                 </button>
               </div>
+            </div>
+          )}
+
+          {game ? (
+            <details className="card play-settings">
+              <summary>
+                <span className="play-settings-title">Nouvelle partie</span>
+                <span className="muted">Couleur, force du bot…</span>
+              </summary>
+              <div className="play-settings-body">{settings}</div>
+            </details>
+          ) : (
+            <div className="card play-settings">
+              <h3>Nouvelle partie</h3>
+              <p className="muted play-intro">Choisissez votre couleur et la force de Stockfish, puis lancez la partie. L’indice et l’explication de vos coups sont là pour apprendre.</p>
+              <div className="play-settings-body">{settings}</div>
             </div>
           )}
         </div>

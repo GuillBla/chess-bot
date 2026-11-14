@@ -6,19 +6,22 @@
    --board-size = hauteur de l'écran − ce qui est au-dessus et en dessous (bandeau, titre, cartes joueur).
    Ainsi toute la zone de jeu tient à l'écran à l'arrivée sur la page, sans dézoomer. */
 .play-page, .analyze-page {
-  --board-reserve: 240px;               /* bandeau + titre compact + barre d'outils sous l'échiquier + marges */
+  --board-reserve: 140px;               /* Analyse : bandeau + barre de navigation sous l'échiquier + marges */
   --board-size: clamp(260px, calc(100vh - var(--board-reserve)), 760px);
 }
 @supports (height: 100dvh) {
   .play-page, .analyze-page { --board-size: clamp(260px, calc(100dvh - var(--board-reserve)), 760px); }
 }
-.play-page.no-game { --board-reserve: 190px; }          /* avant la partie : pas de barre d'outils */
-.play-page:not(.no-game) { --board-reserve: 375px; }   /* + cartes Stockfish / Vous au-dessus et en dessous */
+.play-page.no-game { --board-reserve: 150px; }          /* avant la partie : bandeau + titre */
+.play-page:not(.no-game) { --board-reserve: 185px; }   /* en partie : bandeau + deux bandes joueur (titre masqué, boutons à droite) */
 @media (max-width: 720px) {
-  .play-page, .analyze-page { --board-reserve: 300px; }  /* + barre de navigation du bas */
-  .play-page.no-game { --board-reserve: 250px; }
-  .play-page:not(.no-game) { --board-reserve: 430px; }
+  .play-page, .analyze-page { --board-reserve: 205px; }  /* + barre de navigation du bas */
+  .play-page.no-game { --board-reserve: 215px; }
+  .play-page:not(.no-game) { --board-reserve: 250px; }
 }
+/* Moins de marge en haut sur ces deux pages : chaque pixel va à l'échiquier */
+.content:has(> .play-page), .content:has(> .analyze-page) { padding-top: 0.75rem; }
+.play-page .board-col, .analyze-page .board-col { gap: 6px; }
 
 .board-layout.two-col { display: flex; align-items: flex-start; gap: 1.25rem; }
 .board-layout.two-col > .board-col { flex: 0 1 auto; width: calc(var(--board-size) + 30px); max-width: 100%; min-width: 0; }
@@ -62,23 +65,30 @@
 }
 
 /* ---------- Cartes joueurs ---------- */
+/* Bandes joueur fines (une ligne) au-dessus et au-dessous de l'échiquier */
 .player-card {
-  display: flex; align-items: center; gap: 0.65rem; min-width: 0;
-  padding: 0.45rem 0.7rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  display: flex; align-items: center; gap: 0.55rem; min-width: 0; min-height: 40px;
+  padding: 0.2rem 0.6rem; background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
   box-shadow: inset 3px 0 0 transparent; transition: box-shadow 0.2s, border-color 0.2s;
 }
 .player-card.active { border-color: color-mix(in srgb, var(--brass) 60%, var(--border)); box-shadow: inset 3px 0 0 var(--brass); }
-.player-avatar { display: grid; place-items: center; width: 40px; height: 40px; flex-shrink: 0; border-radius: 6px; background: var(--surface-2); border: 1px solid var(--border); }
-.player-id { min-width: 0; flex: 1; display: grid; gap: 0.1rem; }
-.player-name { display: flex; align-items: baseline; gap: 0.5rem; flex-wrap: wrap; font-family: var(--display); font-weight: 700; font-size: 1.08rem; line-height: 1.2; }
-.player-detail { font-family: var(--mono); font-weight: 400; font-size: 0.74rem; color: var(--muted); }
-.player-captured { display: flex; align-items: center; flex-wrap: wrap; min-height: 18px; row-gap: 2px; }
+.player-avatar { display: grid; place-items: center; width: 30px; height: 30px; flex-shrink: 0; border-radius: 5px; background: var(--surface-2); border: 1px solid var(--border); }
+.player-avatar img { width: 24px !important; height: 24px !important; }
+.player-id { min-width: 0; flex: 1; display: flex; align-items: center; gap: 0.25rem 0.75rem; flex-wrap: wrap; }
+.player-name { display: flex; align-items: baseline; gap: 0.45rem; font-family: var(--display); font-weight: 700; font-size: 1rem; line-height: 1.2; white-space: nowrap; }
+.player-detail { font-family: var(--mono); font-weight: 400; font-size: 0.72rem; color: var(--muted); }
+.player-captured { display: flex; align-items: center; flex-wrap: wrap; min-height: 16px; }
 .player-capt { margin-right: -5px; opacity: 0.9; }
-.player-lead { margin-left: 0.6rem; font-family: var(--mono); font-size: 0.78rem; color: var(--muted); }
-.player-status { flex-shrink: 0; font-size: 0.9rem; }
+.player-lead { margin-left: 0.55rem; font-family: var(--mono); font-size: 0.75rem; color: var(--muted); }
+.player-status { flex-shrink: 0; font-size: 0.88rem; }
 .player-thinking { display: inline-flex; align-items: center; gap: 0.35rem; color: var(--muted); font-style: italic; }
 .player-turn { font-weight: 600; color: var(--accent); }
 .player-turn.check { color: var(--bad); }
+
+/* Barre d'actions de la partie, en tête de la colonne de droite */
+.play-side > .toolbar {
+  padding: 0.6rem 0.7rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow);
+}
 
 .play-result {
   display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.35rem 0.75rem;
@@ -245,9 +255,7 @@ details.analyze-input[open] > summary { margin-bottom: 0.6rem; }
 /* ---------- Petits écrans ---------- */
 @media (max-width: 600px) {
   .expl-san { font-size: 1.55rem; }
-  .player-card { padding: 0.35rem 0.55rem; gap: 0.5rem; }
-  .player-avatar { width: 34px; height: 34px; }
-  .player-avatar img { width: 26px !important; height: 26px !important; }
+
   .play-page .toolbar .btn, .analyze-page .toolbar .btn { padding: 0.42rem 0.7rem; }
   .play-page .toolbar-group, .analyze-page .toolbar-group { flex: 1 1 auto; }
   .analyze-page .nav-group .btn { flex: 1; }
