@@ -1,18 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Link, Route, Routes, useNavigate, useParams } from 'react-router-dom';
-import {
-  Area,
-  AreaChart,
-  Bar,
-  BarChart,
-  CartesianGrid,
-  ReferenceDot,
-  ReferenceLine,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts';
+import { Area, AreaChart, CartesianGrid, ReferenceDot, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import type { Square } from 'chess.js';
 import {
   ChessComError,
@@ -38,12 +26,15 @@ import {
   type ReviewProgress,
   type ReviewedMove,
 } from '../../analysis/gameReview';
-import { MOVE_CLASS_LABELS, MOVE_CLASS_SYMBOLS, isError, winPercent, type MoveClass } from '../../analysis/classify';
+import { MOVE_CLASS_LABELS, isError, winPercent, type MoveClass } from '../../analysis/classify';
 import type { BoardArrow, SquareMark } from '../../analysis/types';
 import Board from '../../components/Board';
 import EvalBar from '../../components/EvalBar';
 import ExplanationPanel from '../../components/ExplanationPanel';
-import { AXIS_PROPS, ChartCard, GRID_PROPS, TooltipBox } from '../../components/stats/chartKit';
+import MoveList from '../../components/MoveList';
+import { PieceIcon, type PieceCode } from '../../components/pieces';
+import { BADGE_SYMBOLS, badgeFor } from '../../components/play/moveClass';
+import { AXIS_PROPS, ChartCard, ResultPill, TooltipBox } from '../../components/stats/chartKit';
 
 // ---------------------------------------------------------------------------
 // Utilitaires d'affichage
@@ -62,23 +53,37 @@ const fmtDate = (ms: number) => new Date(ms).toLocaleDateString('fr-FR', { day: 
 
 const moveLabel = (m: Pick<ReviewedMove, 'ply' | 'san'>) => `${Math.floor(m.ply / 2) + 1}${m.ply % 2 === 0 ? '.' : '…'} ${m.san}`;
 
-function clsBadge(cls: MoveClass): string {
-  if (cls === 'blunder' || cls === 'miss') return 'bad';
-  if (cls === 'mistake' || cls === 'inaccuracy') return 'warn';
-  if (cls === 'best' || cls === 'excellent') return 'good';
-  return '';
-}
-
-function outcomeBadge(o: GameSummary['outcome']): string {
-  return o === 'win' ? 'good' : o === 'loss' ? 'bad' : '';
-}
-
 function isUserReview(r: GameReview, user: string) {
   const u = normalizeUsername(user);
   return r.meta[r.playerColor].toLowerCase() === u;
 }
 
-const COUNT_ROWS: MoveClass[] = ['best', 'excellent', 'good', 'inaccuracy', 'mistake', 'blunder', 'miss'];
+/** Compteurs affichés sous la précision : les coups à problème, avec leur symbole de feuille. */
+const ERROR_CLASSES: MoveClass[] = ['inaccuracy', 'mistake', 'blunder', 'miss'];
+
+/** Pastille de classification (symbole + couleur de la classe, libellé en infobulle). */
+function ClsChip({ cls }: { cls: MoveClass }) {
+  return (
+    <span className={`cls-chip cls-${cls}`} title={MOVE_CLASS_LABELS[cls]} aria-label={MOVE_CLASS_LABELS[cls]}>
+      {BADGE_SYMBOLS[cls]}
+    </span>
+  );
+}
+
+/** Icône de pièce associée à une leçon (repère visuel, pas d'information portée par la seule icône). */
+const LESSON_ICONS: Record<string, PieceCode> = {
+  calcul: 'wN',
+  'tactique-avancee': 'bN',
+  prophylaxie: 'wB',
+  'bonnes-mauvaises-pieces': 'bB',
+  'structures-de-pions': 'wP',
+  'finales-pions': 'bP',
+  'finales-tours': 'wR',
+  'attaque-sur-le-roi': 'bQ',
+  'dynamique-vs-statique': 'wQ',
+  'convertir-avantage': 'wK',
+  defense: 'bK',
+};
 
 // ---------------------------------------------------------------------------
 // Conteneur : charge les parties, possède le moteur de revue (unitaire ou par lot)
@@ -238,7 +243,7 @@ function JobProgress({ ctx, game }: { ctx: Ctx; game?: GameSummary }) {
 }
 
 // ---------------------------------------------------------------------------
-// Liste + rapport agrégé
+// Liste (feuille de résultats) + rapport agrégé
 // ---------------------------------------------------------------------------
 
 function GamesHome({ ctx }: { ctx: Ctx }) {
@@ -260,28 +265,37 @@ function GamesHome({ ctx }: { ctx: Ctx }) {
         récurrentes, avec les leçons qui y répondent.
       </p>
       <form className="mg-toolbar" onSubmit={onSubmit}>
-        <label htmlFor="mg-user">Pseudo</label>
-        <input id="mg-user" type="text" value={input} onChange={(e) => setInput(e.target.value)} style={{ maxWidth: 180 }} spellCheck={false} />
-        <button className="btn" type="submit">
-          Charger
-        </button>
-        <label htmlFor="mg-tc">Cadence</label>
-        <select id="mg-tc" value={ctx.timeClass} onChange={(e) => ctx.setTimeClass(e.target.value as TimeClass | 'all')}>
-          <option value="all">Toutes</option>
-          {(Object.keys(TIME_CLASS_LABELS) as TimeClass[]).map((tc) => (
-            <option key={tc} value={tc}>
-              {TIME_CLASS_LABELS[tc]}
-            </option>
-          ))}
-        </select>
-        <label htmlFor="mg-n">Parties</label>
-        <select id="mg-n" value={ctx.count} onChange={(e) => ctx.setCount(+e.target.value)}>
-          {[10, 20, 50].map((n) => (
-            <option key={n} value={n}>
-              {n}
-            </option>
-          ))}
-        </select>
+        <div className="field">
+          <label htmlFor="mg-user">Joueur</label>
+          <div className="btn-row" style={{ flexWrap: 'nowrap' }}>
+            <input id="mg-user" type="text" value={input} onChange={(e) => setInput(e.target.value)} spellCheck={false} autoComplete="off" />
+            <button className="btn" type="submit">
+              Charger
+            </button>
+          </div>
+        </div>
+        <div className="field">
+          <label htmlFor="mg-tc">Cadence</label>
+          <select id="mg-tc" value={ctx.timeClass} onChange={(e) => ctx.setTimeClass(e.target.value as TimeClass | 'all')}>
+            <option value="all">Toutes</option>
+            {(Object.keys(TIME_CLASS_LABELS) as TimeClass[]).map((tc) => (
+              <option key={tc} value={tc}>
+                {TIME_CLASS_LABELS[tc]}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="field">
+          <label htmlFor="mg-n">Parties</label>
+          <select id="mg-n" value={ctx.count} onChange={(e) => ctx.setCount(+e.target.value)}>
+            {[10, 20, 50].map((n) => (
+              <option key={n} value={n}>
+                {n}
+              </option>
+            ))}
+          </select>
+        </div>
+        <span className="spacer" />
         <button
           className="btn primary"
           type="button"
@@ -311,66 +325,83 @@ function GamesHome({ ctx }: { ctx: Ctx }) {
       )}
 
       {ctx.games.length > 0 && (
-        <div className="card table-scroll">
-          <table className="mg-games stats-table">
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Cadence</th>
-                <th>Adversaire</th>
-                <th>Résultat</th>
-                <th>Ouverture</th>
-                <th className="num">Précision</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {ctx.games.map((g) => {
-                const r = ctx.reviews[g.url];
-                const running = ctx.job?.url === g.url;
-                return (
-                  <tr key={g.url} className={running ? 'current' : ''}>
-                    <td style={{ whiteSpace: 'nowrap' }}>{fmtDate(g.endTime)}</td>
-                    <td>
-                      {TIME_CLASS_LABELS[g.timeClass]} <span className="muted">{formatTimeControl(g.timeControl)}</span>
-                    </td>
-                    <td>
-                      <span title={g.color === 'white' ? 'Tu avais les Blancs' : 'Tu avais les Noirs'}>{g.color === 'white' ? '♔' : '♚'}</span>{' '}
-                      {g.opponent} <span className="muted">({g.oppRating})</span>
-                    </td>
-                    <td>
-                      <span className={`badge ${outcomeBadge(g.outcome)}`}>{OUTCOME_LABELS[g.outcome]}</span>{' '}
-                      <span className="muted">{END_REASON_LABELS[g.reason].toLowerCase()}</span>
-                    </td>
-                    <td>
-                      {g.opening.name} <span className="muted mono">{g.opening.eco}</span>
-                    </td>
-                    <td className="num">{r?.accuracy[r.playerColor] != null ? `${r.accuracy[r.playerColor]!.toFixed(1)} %` : '—'}</td>
-                    <td style={{ whiteSpace: 'nowrap' }}>
-                      {r ? (
-                        <Link className="btn" to={`partie/${g.id}`}>
-                          Voir l'analyse
-                        </Link>
-                      ) : (
-                        <button
-                          className="btn"
-                          type="button"
-                          disabled={!!ctx.job}
-                          onClick={() => {
-                            ctx.analyse(g);
-                            navigate(`partie/${g.id}`);
-                          }}
-                        >
-                          {running ? 'En cours…' : 'Analyser'}
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        <section className="card results-sheet">
+          <div className="sheet-head">
+            <h2>Feuille de résultats</h2>
+            <span className="muted">
+              {ctx.games.length} parties · {ctx.games.filter((g) => ctx.reviews[g.url]).length} analysées
+            </span>
+          </div>
+          <div className="table-scroll">
+            <table className="mg-games stats-table">
+              <thead>
+                <tr>
+                  <th className="num">N°</th>
+                  <th>Adversaire</th>
+                  <th>Rés.</th>
+                  <th>Ouverture</th>
+                  <th>Cadence</th>
+                  <th>Date</th>
+                  <th className="num">Précision</th>
+                  <th aria-label="Action" />
+                </tr>
+              </thead>
+              <tbody>
+                {ctx.games.map((g, i) => {
+                  const r = ctx.reviews[g.url];
+                  const running = ctx.job?.url === g.url;
+                  const acc = r?.accuracy[r.playerColor];
+                  return (
+                    <tr key={g.url} className={running ? 'current' : ''}>
+                      <td className="rd">{i + 1}</td>
+                      <td>
+                        <span className="mg-opp">
+                          <PieceIcon
+                            piece={g.color === 'white' ? 'wK' : 'bK'}
+                            size={20}
+                            title={g.color === 'white' ? 'Tu avais les Blancs' : 'Tu avais les Noirs'}
+                          />
+                          <strong>{g.opponent}</strong>
+                          <span className="mg-elo">{g.oppRating}</span>
+                        </span>
+                      </td>
+                      <td>
+                        <ResultPill outcome={g.outcome} title={`${OUTCOME_LABELS[g.outcome]} · ${END_REASON_LABELS[g.reason].toLowerCase()}`} />
+                      </td>
+                      <td className="wrap">
+                        {g.opening.name} <span className="muted mono">{g.opening.eco}</span>
+                      </td>
+                      <td>
+                        {TIME_CLASS_LABELS[g.timeClass]} <span className="muted mono">{formatTimeControl(g.timeControl)}</span>
+                      </td>
+                      <td>{fmtDate(g.endTime)}</td>
+                      <td className="num mg-acc-cell">{acc != null ? `${acc.toFixed(1)} %` : <span className="muted">—</span>}</td>
+                      <td>
+                        {r ? (
+                          <Link className="btn" to={`partie/${g.id}`}>
+                            Voir l'analyse
+                          </Link>
+                        ) : (
+                          <button
+                            className="btn"
+                            type="button"
+                            disabled={!!ctx.job}
+                            onClick={() => {
+                              ctx.analyse(g);
+                              navigate(`partie/${g.id}`);
+                            }}
+                          >
+                            {running ? 'En cours…' : 'Analyser'}
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </section>
       )}
       {!ctx.loading && !ctx.error && ctx.games.length === 0 && <p className="muted">Aucune partie trouvée.</p>}
 
@@ -391,41 +422,57 @@ function AggregateView({ reviews }: { reviews: GameReview[] }) {
   const errors = rep.classCounts.mistake + rep.classCounts.blunder + rep.classCounts.miss;
   const worstPhase = [...rep.phases].filter((p) => p.moves > 0).sort((a, b) => b.winLoss - a.winLoss)[0];
   const costly = rep.openings.filter((o) => o.errors > 0).slice(0, 5);
-  const catData = rep.categories.map((c) => ({ ...c }));
+  const maxCat = Math.max(1, ...rep.categories.map((c) => c.count));
   return (
     <>
-      <h2>Rapport sur {rep.games} partie{rep.games > 1 ? 's' : ''} analysée{rep.games > 1 ? 's' : ''}</h2>
+      <div className="report-head">
+        <h2>Rapport de tournoi</h2>
+        <span className="muted">
+          {rep.games} partie{rep.games > 1 ? 's' : ''} analysée{rep.games > 1 ? 's' : ''} · {rep.playerMoves} coups joués
+        </span>
+      </div>
       <div className="stat-tiles">
         <div className="stat-tile">
           <div className="stat-tile-label">Précision moyenne</div>
           <div className="stat-tile-value">{rep.avgAccuracy != null ? `${rep.avgAccuracy.toFixed(1)} %` : '—'}</div>
         </div>
         <div className="stat-tile">
-          <div className="stat-tile-label">Imprécisions / partie</div>
+          <div className="stat-tile-label">
+            <ClsChip cls="inaccuracy" /> Imprécisions / partie
+          </div>
           <div className="stat-tile-value">{(rep.classCounts.inaccuracy / rep.games).toFixed(1)}</div>
         </div>
         <div className="stat-tile">
-          <div className="stat-tile-label">Erreurs + gaffes / partie</div>
+          <div className="stat-tile-label">
+            <ClsChip cls="mistake" /> <ClsChip cls="blunder" /> Erreurs + gaffes / partie
+          </div>
           <div className="stat-tile-value">{(errors / rep.games).toFixed(1)}</div>
         </div>
         {worstPhase && (
           <div className="stat-tile">
             <div className="stat-tile-label">Phase la plus coûteuse</div>
-            <div className="stat-tile-value" style={{ fontSize: '1.25rem' }}>
+            <div className="stat-tile-value" style={{ fontSize: '1.35rem' }}>
               {worstPhase.label}
             </div>
+            <div className="stat-tile-meta">−{Math.round(worstPhase.winLoss)} % de chances de gain cumulées</div>
           </div>
         )}
       </div>
 
       {rep.recommendations.length > 0 && (
-        <section className="card">
-          <h3>Leçons recommandées</h3>
-          <div className="card-grid">
+        <section aria-labelledby="mg-lessons">
+          <h3 id="mg-lessons">Leçons recommandées</h3>
+          <div className="lesson-cards">
             {rep.recommendations.map((r) => (
-              <Link key={r.lesson.id} to={`/teacher/lessons/${r.lesson.id}`} className="card link-card mg-rec">
-                <strong>{r.lesson.title}</strong>
-                <p>{r.why}</p>
+              <Link key={r.lesson.id} to={`/teacher/lessons/${r.lesson.id}`} className="card link-card lesson-card">
+                <span className="icon" aria-hidden>
+                  <PieceIcon piece={LESSON_ICONS[r.lesson.id] ?? 'wP'} size={32} />
+                </span>
+                <div>
+                  <strong>{r.lesson.title}</strong>
+                  <p>{r.why}</p>
+                  <span className="go">Ouvrir la leçon →</span>
+                </div>
               </Link>
             ))}
           </div>
@@ -433,40 +480,30 @@ function AggregateView({ reviews }: { reviews: GameReview[] }) {
       )}
 
       <div className="viz-grid">
-        <ChartCard title="Erreurs récurrentes" subtitle="Erreurs, gaffes et coups manqués, par catégorie (un coup peut en cumuler plusieurs)">
-          {catData.length === 0 ? (
+        <ChartCard title="Erreurs récurrentes" subtitle="Erreurs, gaffes et coups manqués par catégorie (un coup peut en cumuler plusieurs)">
+          {rep.categories.length === 0 ? (
             <p className="muted">Aucune erreur détectée : bravo !</p>
           ) : (
-            <ResponsiveContainer width="100%" height={catData.length * 34 + 24}>
-              <BarChart data={catData} layout="vertical" margin={{ top: 0, right: 36, bottom: 0, left: 0 }} barCategoryGap={8}>
-                <XAxis type="number" hide allowDecimals={false} />
-                <YAxis type="category" dataKey="label" width={200} {...AXIS_PROPS} axisLine={false} />
-                <Tooltip
-                  cursor={{ fill: 'var(--viz-hover)' }}
-                  content={({ active, payload }) => {
-                    if (!active || !payload?.length) return null;
-                    const c = payload[0].payload as (typeof catData)[number];
-                    return (
-                      <TooltipBox
-                        title={c.label}
-                        rows={[
-                          { color: 'var(--viz-loss)', label: 'Coups', value: c.count },
-                          { label: 'Parties concernées', value: c.games },
-                          { label: 'Win% perdu (total)', value: Math.round(c.winLoss) },
-                        ]}
-                      />
-                    );
-                  }}
-                />
-                <Bar
-                  dataKey="count"
-                  fill="var(--viz-loss)"
-                  radius={[0, 4, 4, 0]}
-                  isAnimationActive={false}
-                  label={{ position: 'right', fill: 'var(--viz-axis)', fontSize: 12 }}
-                />
-              </BarChart>
-            </ResponsiveContainer>
+            <ul className="hbars">
+              {rep.categories.map((c) => (
+                <li
+                  key={c.category}
+                  className="hbar"
+                  title={`${c.label} : ${c.count} coup${c.count > 1 ? 's' : ''}, ${c.games} partie${c.games > 1 ? 's' : ''}, ${Math.round(c.winLoss)} % de chances de gain perdues`}
+                >
+                  <div className="hbar-label">
+                    <span>{c.label}</span>
+                    <span className="hbar-value">
+                      {c.count}
+                      <small> · {c.games} p.</small>
+                    </span>
+                  </div>
+                  <div className="hbar-track">
+                    <div className="hbar-fill" style={{ width: `${(c.count / maxCat) * 100}%` }} />
+                  </div>
+                </li>
+              ))}
+            </ul>
           )}
         </ChartCard>
 
@@ -478,7 +515,7 @@ function AggregateView({ reviews }: { reviews: GameReview[] }) {
                   <th>Phase</th>
                   <th className="num">Coups</th>
                   <th className="num">Erreurs</th>
-                  <th className="num">Perte moy. / coup</th>
+                  <th className="num">Perte / coup</th>
                   <th className="num">Perte totale</th>
                 </tr>
               </thead>
@@ -514,7 +551,10 @@ function AggregateView({ reviews }: { reviews: GameReview[] }) {
                   {costly.map((o) => (
                     <tr key={o.color + o.name}>
                       <td>
-                        {o.name} <span className="muted">({o.color === 'white' ? 'Blancs' : 'Noirs'})</span>
+                        <span className="mg-opp">
+                          <PieceIcon piece={o.color === 'white' ? 'wK' : 'bK'} size={16} title={o.color === 'white' ? 'Blancs' : 'Noirs'} />
+                          {o.name}
+                        </span>
                       </td>
                       <td className="num">{o.games}</td>
                       <td className="num">{o.errors}</td>
@@ -533,7 +573,7 @@ function AggregateView({ reviews }: { reviews: GameReview[] }) {
 }
 
 // ---------------------------------------------------------------------------
-// Vue d'une partie
+// Vue d'une partie : salle d'analyse
 // ---------------------------------------------------------------------------
 
 function GameView({ ctx }: { ctx: Ctx }) {
@@ -575,7 +615,9 @@ function GameView({ ctx }: { ctx: Ctx }) {
   if (!parsed || !pgn) {
     return (
       <div className="page">
-        <Link to="..">← Retour à la liste</Link>
+        <Link className="mg-back" to="..">
+          ← Retour à la feuille de résultats
+        </Link>
         {ctx.loading ? (
           <p className="muted">
             <span className="spinner" /> Chargement de la partie…
@@ -596,6 +638,7 @@ function GameView({ ctx }: { ctx: Ctx }) {
   const running = ctx.job?.url === (summary?.url ?? review?.url);
   const white = review?.meta.white ?? parsed.headers.White ?? 'Blancs';
   const black = review?.meta.black ?? parsed.headers.Black ?? 'Noirs';
+  const eloOf = (c: 'white' | 'black') => (summary ? (summary.color === c ? summary.myRating : summary.oppRating) : null);
 
   // Flèches par défaut : sur une position précédant une erreur, coup joué (rouge) vs meilleur coup (vert).
   let arrows: BoardArrow[] = [];
@@ -611,26 +654,54 @@ function GameView({ ctx }: { ctx: Ctx }) {
   }
 
   const keyMoments = review?.keyMoments ?? [];
+  const openKey = (idx: number) => {
+    const m = review!.moves[idx];
+    if (selectedKey === idx) {
+      setSelectedKey(null);
+      return;
+    }
+    setPly(m.ply);
+    setSelectedKey(idx);
+    setFocus(null);
+  };
 
   return (
     <div className="page">
-      <div className="mg-nav">
-        <Link to="..">← Retour à la liste</Link>
-      </div>
-      <h2 style={{ margin: 0 }}>
-        {white} – {black}
-      </h2>
-      <p className="muted" style={{ margin: 0 }}>
-        {summary && (
-          <>
-            <span className={`badge ${outcomeBadge(summary.outcome)}`}>{OUTCOME_LABELS[summary.outcome]}</span> {END_REASON_LABELS[summary.reason].toLowerCase()} ·{' '}
-            {TIME_CLASS_LABELS[summary.timeClass]} · {fmtDate(summary.endTime)} · {summary.opening.name} ({summary.opening.eco}) ·{' '}
-          </>
-        )}
-        <a href={summary?.url ?? review?.url} target="_blank" rel="noreferrer">
-          Voir sur chess.com
-        </a>
-      </p>
+      <Link className="mg-back" to="..">
+        ← Retour à la feuille de résultats
+      </Link>
+      <header className="mg-title">
+        <span className="eyebrow">Salle d'analyse</span>
+        <h2>
+          <PieceIcon piece="wK" size={28} title="Blancs" />
+          {white}
+          {eloOf('white') != null && <span className="mg-elo">{eloOf('white')}</span>}
+          <span className="vs">contre</span>
+          <PieceIcon piece="bK" size={28} title="Noirs" />
+          {black}
+          {eloOf('black') != null && <span className="mg-elo">{eloOf('black')}</span>}
+        </h2>
+        <div className="mg-sub">
+          {summary && (
+            <>
+              <ResultPill outcome={summary.outcome} />
+              <span>
+                {OUTCOME_LABELS[summary.outcome]} · {END_REASON_LABELS[summary.reason].toLowerCase()}
+              </span>
+              <span>
+                {TIME_CLASS_LABELS[summary.timeClass]} <span className="mono">{formatTimeControl(summary.timeControl)}</span>
+              </span>
+              <span>{fmtDate(summary.endTime)}</span>
+              <span>
+                {summary.opening.name} <span className="mono">{summary.opening.eco}</span>
+              </span>
+            </>
+          )}
+          <a href={summary?.url ?? review?.url} target="_blank" rel="noreferrer">
+            Voir sur chess.com
+          </a>
+        </div>
+      </header>
       <div className="btn-row">
         <button className="btn" type="button" onClick={() => navigate('/analyze', { state: { pgn } })}>
           Ouvrir dans l'analyse
@@ -648,138 +719,156 @@ function GameView({ ctx }: { ctx: Ctx }) {
         </p>
       )}
 
-      <div className="board-layout">
-        <EvalBar whiteCp={evalCp} label={review ? fmtEval(evalCp) : '?'} orientation={playerColor} height={420} />
-        <div className="board-col">
-          <Board fen={fen} orientation={playerColor} lastMove={lastMove} arrows={arrows} marks={marks} id="mygames-board" />
-          <div className="btn-row" style={{ marginTop: '0.5rem', justifyContent: 'center' }}>
-            <button className="btn" type="button" onClick={() => goto(0)} aria-label="Début">
+      <div className="mg-room">
+        <div className="mg-board-col">
+          <div className="mg-board-row">
+            <EvalBar whiteCp={evalCp} label={review ? fmtEval(evalCp) : '?'} orientation={playerColor} />
+            <div className="mg-board">
+              <Board
+                fen={fen}
+                orientation={playerColor}
+                lastMove={lastMove}
+                arrows={arrows}
+                marks={marks}
+                badge={prevMove ? badgeFor(prevMove.uci, prevMove.cls) : null}
+                id="mygames-board"
+              />
+            </div>
+          </div>
+          <div className="mg-board-nav">
+            <button className="btn" type="button" onClick={() => goto(0)} aria-label="Début" title="Début (Origine)">
               ⏮
             </button>
-            <button className="btn" type="button" onClick={() => goto(ply - 1)} aria-label="Coup précédent">
+            <button className="btn" type="button" onClick={() => goto(ply - 1)} aria-label="Coup précédent" title="Coup précédent (←)">
               ◀
             </button>
-            <span className="muted" style={{ alignSelf: 'center', minWidth: '5rem', textAlign: 'center' }}>
+            <span className="cur" aria-live="polite">
               {ply === 0 ? 'Départ' : moveLabel({ ply: ply - 1, san: parsed.moves[ply - 1].san })}
+              {prevMove && <ClsChip cls={prevMove.cls} />}
             </span>
-            <button className="btn" type="button" onClick={() => goto(ply + 1)} aria-label="Coup suivant">
+            <button className="btn" type="button" onClick={() => goto(ply + 1)} aria-label="Coup suivant" title="Coup suivant (→)">
               ▶
             </button>
-            <button className="btn" type="button" onClick={() => goto(n)} aria-label="Fin">
+            <button className="btn" type="button" onClick={() => goto(n)} aria-label="Fin" title="Fin">
               ⏭
             </button>
           </div>
+          {review && <EvalGraph review={review} ply={ply} onSelect={goto} />}
         </div>
-        <div className="side-col" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+
+        <div className="mg-side">
           {review ? (
             <>
               <div className="mg-acc">
-                {(['white', 'black'] as const).map((c) => (
-                  <div key={c} className={`stat-tile ${c === playerColor ? 'me' : ''}`}>
-                    <div className="stat-tile-label">Précision {c === 'white' ? 'Blancs' : 'Noirs'}</div>
-                    <div className="stat-tile-value">{review.accuracy[c] != null ? `${review.accuracy[c]!.toFixed(1)} %` : '—'}</div>
-                    <div className="stat-tile-meta">{c === 'white' ? white : black}</div>
-                  </div>
-                ))}
+                {(['white', 'black'] as const).map((c) => {
+                  const acc = review.accuracy[c];
+                  return (
+                    <div key={c} className={`acc-card ${c === playerColor ? 'me' : ''}`}>
+                      <div className="acc-who">
+                        <PieceIcon piece={c === 'white' ? 'wK' : 'bK'} size={18} title={c === 'white' ? 'Blancs' : 'Noirs'} />
+                        <span>{c === 'white' ? white : black}</span>
+                      </div>
+                      <div className="acc-value">
+                        {acc != null ? acc.toFixed(1) : '—'}
+                        <small> % précision</small>
+                      </div>
+                      <div className="acc-counts">
+                        {ERROR_CLASSES.filter((k) => k !== 'miss' || review.counts.white.miss + review.counts.black.miss > 0).map((k) => (
+                          <span key={k} title={`${MOVE_CLASS_LABELS[k]} : ${review.counts[c][k]}`}>
+                            <ClsChip cls={k} />
+                            {review.counts[c][k]}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-              <div className="card" style={{ padding: '0.6rem 0.8rem' }}>
-                <div className="mg-counts">
-                  <span />
-                  <strong className="num">Blancs</strong>
-                  <strong className="num">Noirs</strong>
-                  {COUNT_ROWS.filter((c) => c !== 'miss' || review.counts.white.miss + review.counts.black.miss > 0).map((c) => (
-                    <FragmentRow key={c} cls={c} w={review.counts.white[c]} b={review.counts.black[c]} />
-                  ))}
-                </div>
-              </div>
-              {prevMove && (
-                <div className="card" style={{ padding: '0.6rem 0.8rem' }}>
-                  <div>
-                    <strong>{moveLabel(prevMove)}</strong> <span className={`badge ${clsBadge(prevMove.cls)}`}>{MOVE_CLASS_LABELS[prevMove.cls]}</span>{' '}
+              {prevMove ? (
+                <div className="card mg-current">
+                  <div className="mg-current-head">
+                    <ClsChip cls={prevMove.cls} />
+                    <span className="san">{moveLabel(prevMove)}</span>
+                    <span>{MOVE_CLASS_LABELS[prevMove.cls]}</span>
                     <span className="mono muted">{fmtEval(prevMove.evalAfter)}</span>
                   </div>
                   {prevMove.cls !== 'best' && prevMove.bestSan && (
-                    <div className="muted" style={{ fontSize: '0.9rem' }}>
+                    <div className="best">
                       Meilleur : <strong>{prevMove.bestSan}</strong> — <span className="mono">{prevMove.bestLine}</span>
                     </div>
                   )}
                 </div>
+              ) : (
+                <div className="card mg-current muted">Position de départ. Utilise ← → ou clique un coup.</div>
               )}
             </>
           ) : (
             !running && <p className="muted">Lance l'analyse pour obtenir la précision, la classification des coups et les moments clés.</p>
           )}
-          <MoveList moves={parsed.moves.map((m, i) => ({ san: m.san, cls: review?.moves[i]?.cls }))} ply={ply} onSelect={goto} />
+          <MoveList sans={parsed.moves.map((m) => m.san)} current={ply} onSelect={goto} classes={review ? review.moves.map((m) => m.cls) : undefined} />
         </div>
       </div>
 
-      {review && <EvalGraph review={review} ply={ply} onSelect={goto} />}
-
       {review && (
-        <section className="card">
-          <h3>Moments clés</h3>
+        <section className="card" aria-labelledby="mg-key-title">
+          <h2 id="mg-key-title" style={{ marginTop: 0 }}>
+            Moments clés
+          </h2>
           {keyMoments.length === 0 ? (
             <p className="muted">Aucune erreur notable de ta part dans cette partie. Belle partie !</p>
           ) : (
-            keyMoments.map((idx) => {
-              const m = review.moves[idx];
-              return (
-                <div key={idx} className={`mg-key ${m.cls}`}>
-                  <div className="mg-key-head">
-                    <button
-                      className="btn"
-                      type="button"
-                      onClick={() => {
-                        setPly(m.ply);
-                        setSelectedKey(idx);
-                        setFocus(null);
-                      }}
-                    >
-                      {moveLabel(m)}
-                      {MOVE_CLASS_SYMBOLS[m.cls] ?? ''}
-                    </button>
-                    <span className={`badge ${clsBadge(m.cls)}`}>{MOVE_CLASS_LABELS[m.cls]}</span>
-                    <span className="muted">
-                      {fmtEval(m.evalBefore)} → {fmtEval(m.evalAfter)} · −{Math.round(m.winLoss)} % de chances de gain
-                    </span>
-                  </div>
-                  <div className="mg-cats">
-                    {m.categories.map((c) => (
-                      <span key={c} className="badge">
-                        {CATEGORY_LABELS[c]}
-                      </span>
-                    ))}
-                  </div>
-                  {m.bestSan && (
-                    <p style={{ margin: '0.3rem 0' }}>
-                      Il fallait jouer <strong>{m.bestSan}</strong> : <span className="mono">{m.bestLine}</span>
-                    </p>
-                  )}
-                  {selectedKey === idx && m.explanation && (
-                    <ExplanationPanel
-                      explanation={m.explanation}
-                      onFocusArrows={(a: BoardArrow[], mk: SquareMark[]) => {
-                        setPly(m.ply);
-                        setFocus({ arrows: a, marks: mk });
-                      }}
-                    />
-                  )}
-                  {selectedKey !== idx && m.explanation && (
-                    <button
-                      className="btn ghost"
-                      type="button"
-                      onClick={() => {
-                        setPly(m.ply);
-                        setSelectedKey(idx);
-                        setFocus(null);
-                      }}
-                    >
-                      Voir l'explication
-                    </button>
-                  )}
-                </div>
-              );
-            })
+            <ol className="key-list">
+              {keyMoments.map((idx) => {
+                const m = review.moves[idx];
+                const on = selectedKey === idx;
+                return (
+                  <li key={idx} className={`key-item ${on ? 'on' : ''}`}>
+                    <span className="key-num" aria-hidden />
+                    <div className="key-body">
+                      <button className="key-head" type="button" onClick={() => openKey(idx)} aria-expanded={on}>
+                        <ClsChip cls={m.cls} />
+                        <span className="san">{moveLabel(m)}</span>
+                        <span>{MOVE_CLASS_LABELS[m.cls]}</span>
+                        <span className="key-eval">
+                          {fmtEval(m.evalBefore)} → {fmtEval(m.evalAfter)}
+                        </span>
+                        <span className="key-loss">−{Math.round(m.winLoss)} % de chances de gain</span>
+                      </button>
+                      {m.categories.length > 0 && (
+                        <div className="mg-cats">
+                          {m.categories.map((c) => (
+                            <span key={c} className="badge">
+                              {CATEGORY_LABELS[c]}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      {m.bestSan && (
+                        <p className="key-best">
+                          Il fallait jouer <strong>{m.bestSan}</strong> : <span className="mono">{m.bestLine}</span>
+                        </p>
+                      )}
+                      {on && m.explanation && (
+                        <ExplanationPanel
+                          explanation={m.explanation}
+                          cls={m.cls}
+                          fenBefore={m.fenBefore}
+                          onFocusArrows={(a: BoardArrow[], mk: SquareMark[]) => {
+                            setPly(m.ply);
+                            setFocus({ arrows: a, marks: mk });
+                          }}
+                        />
+                      )}
+                      {!on && m.explanation && (
+                        <button className="btn ghost" type="button" style={{ justifySelf: 'start', padding: '0.2rem 0.5rem' }} onClick={() => openKey(idx)}>
+                          Voir l'explication
+                        </button>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
+            </ol>
           )}
         </section>
       )}
@@ -787,48 +876,11 @@ function GameView({ ctx }: { ctx: Ctx }) {
   );
 }
 
-function FragmentRow({ cls, w, b }: { cls: MoveClass; w: number; b: number }) {
-  return (
-    <>
-      <span>
-        <span className={`badge ${clsBadge(cls)}`}>{MOVE_CLASS_LABELS[cls]}</span>
-      </span>
-      <span className="num">{w}</span>
-      <span className="num">{b}</span>
-    </>
-  );
-}
+// ---------------------------------------------------------------------------
+// Graphe d'évaluation : fond noyer (Noirs), aire ivoire (Blancs)
+// ---------------------------------------------------------------------------
 
-function MoveList({ moves, ply, onSelect }: { moves: { san: string; cls?: MoveClass }[]; ply: number; onSelect: (p: number) => void }) {
-  const rows: { no: number; w?: number; b?: number }[] = [];
-  for (let i = 0; i < moves.length; i += 2) rows.push({ no: i / 2 + 1, w: i, b: i + 1 < moves.length ? i + 1 : undefined });
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    ref.current?.querySelector('button.current')?.scrollIntoView({ block: 'nearest' });
-  }, [ply]);
-  const btn = (i?: number) => {
-    if (i === undefined) return <span />;
-    const m = moves[i];
-    const tone = m.cls === 'blunder' || m.cls === 'miss' ? 'bad' : m.cls === 'mistake' || m.cls === 'inaccuracy' ? 'warn' : '';
-    return (
-      <button type="button" className={`${tone} ${ply === i + 1 ? 'current' : ''}`} onClick={() => onSelect(i + 1)} title={m.cls ? MOVE_CLASS_LABELS[m.cls] : undefined}>
-        {m.san}
-        {m.cls ? (MOVE_CLASS_SYMBOLS[m.cls] ?? '') : ''}
-      </button>
-    );
-  };
-  return (
-    <div className="movelist mg-moves" ref={ref}>
-      {rows.map((r) => (
-        <div key={r.no} style={{ display: 'contents' }}>
-          <span className="num">{r.no}.</span>
-          {btn(r.w)}
-          {btn(r.b)}
-        </div>
-      ))}
-    </div>
-  );
-}
+const DOT_CLASSES: MoveClass[] = ['inaccuracy', 'mistake', 'blunder', 'miss'];
 
 function EvalGraph({ review, ply, onSelect }: { review: GameReview; ply: number; onSelect: (p: number) => void }) {
   const data = review.evals.map((cp, i) => ({
@@ -837,25 +889,35 @@ function EvalGraph({ review, ply, onSelect }: { review: GameReview; ply: number;
     cp,
     move: i > 0 ? review.moves[i - 1] : null,
   }));
-  const errs = review.moves.filter((m) => m.cls === 'blunder' || m.cls === 'mistake' || m.cls === 'miss');
+  // Points : erreurs, gaffes et coups manqués des deux camps ; imprécisions seulement pour le joueur.
+  const marks = review.moves.filter(
+    (m) => m.cls === 'blunder' || m.cls === 'mistake' || m.cls === 'miss' || (m.cls === 'inaccuracy' && m.color === review.playerColor),
+  );
+  const shown = DOT_CLASSES.filter((c) => marks.some((m) => m.cls === c));
   return (
-    <ChartCard title="Évolution de l'évaluation" subtitle="Chances de gain des Blancs (clique sur le graphe pour aller au coup)">
-      <ResponsiveContainer width="100%" height={220}>
+    <ChartCard className="eval-card" title="Évaluation" subtitle="Chances de gain des Blancs, coup par coup. Clique pour t'y rendre.">
+      <ResponsiveContainer width="100%" height={150}>
         <AreaChart
           data={data}
-          margin={{ top: 8, right: 12, bottom: 0, left: 0 }}
+          margin={{ top: 6, right: 6, bottom: 0, left: 6 }}
           onClick={(e) => {
             if (e && e.activeLabel !== undefined && e.activeLabel !== null) onSelect(Number(e.activeLabel));
           }}
           style={{ cursor: 'pointer' }}
         >
-          <CartesianGrid {...GRID_PROPS} />
-          <XAxis dataKey="ply" type="number" domain={[0, data.length - 1]} tickFormatter={(p) => String(Math.ceil(p / 2))} {...AXIS_PROPS} allowDecimals={false} />
-          <YAxis domain={[0, 100]} ticks={[0, 50, 100]} tickFormatter={(v) => `${v} %`} width={44} {...AXIS_PROPS} axisLine={false} />
-          <ReferenceLine y={50} stroke="var(--viz-axis-line)" />
-          <ReferenceLine x={ply} stroke="var(--accent)" strokeWidth={2} />
+          <CartesianGrid fill="var(--viz-eval-bg)" fillOpacity={1} horizontal={false} vertical={false} />
+          <XAxis
+            dataKey="ply"
+            type="number"
+            domain={[0, data.length - 1]}
+            tickFormatter={(p) => String(Math.ceil(p / 2))}
+            {...AXIS_PROPS}
+            allowDecimals={false}
+            minTickGap={24}
+          />
+          <YAxis domain={[0, 100]} hide />
           <Tooltip
-            cursor={{ stroke: 'var(--viz-axis)', strokeWidth: 1 }}
+            cursor={{ stroke: 'var(--viz-eval-line)', strokeWidth: 1 }}
             content={({ active, payload }) => {
               if (!active || !payload?.length) return null;
               const d = payload[0].payload as (typeof data)[number];
@@ -863,7 +925,7 @@ function EvalGraph({ review, ply, onSelect }: { review: GameReview; ply: number;
                 <TooltipBox
                   title={d.move ? moveLabel(d.move) : 'Position de départ'}
                   rows={[
-                    { color: 'var(--viz-1)', label: 'Éval', value: fmtEval(d.cp) },
+                    { label: 'Éval', value: fmtEval(d.cp) },
                     { label: 'Gain Blancs', value: `${Math.round(d.win)} %` },
                     ...(d.move ? [{ label: 'Coup', value: MOVE_CLASS_LABELS[d.move.cls] }] : []),
                   ]}
@@ -871,24 +933,52 @@ function EvalGraph({ review, ply, onSelect }: { review: GameReview; ply: number;
               );
             }}
           />
-          <Area type="monotone" dataKey="win" stroke="var(--viz-1)" strokeWidth={2} fill="var(--viz-eval-fill)" baseValue={50} isAnimationActive={false} activeDot={{ r: 4, stroke: 'var(--surface)', strokeWidth: 2 }} />
-          {errs.map((m) => (
+          <Area
+            type="monotone"
+            dataKey="win"
+            stroke="var(--viz-eval-line)"
+            strokeWidth={2}
+            fill="var(--viz-eval-area)"
+            fillOpacity={1}
+            baseValue={0}
+            isAnimationActive={false}
+            activeDot={{ r: 4, stroke: 'var(--viz-eval-bg)', strokeWidth: 2, fill: 'var(--viz-eval-line)' }}
+          />
+          <ReferenceLine y={50} stroke="var(--viz-eval-mid)" strokeDasharray="3 3" />
+          <ReferenceLine x={ply} stroke="var(--viz-eval-line)" strokeWidth={2} />
+          {marks.map((m) => (
             <ReferenceDot
               key={m.ply}
               x={m.ply + 1}
               y={winPercent(m.evalAfter)}
-              r={m.color === review.playerColor ? 5 : 4}
-              fill={m.cls === 'mistake' ? 'var(--warn)' : 'var(--bad)'}
-              stroke="var(--surface)"
-              strokeWidth={2}
+              r={m.color === review.playerColor ? 5.5 : 4}
+              shape={(p: { cx?: number; cy?: number; r?: number }) => (
+                <circle
+                  className={`cls-${m.cls}`}
+                  cx={p.cx}
+                  cy={p.cy}
+                  r={p.r}
+                  style={{ fill: 'var(--cls)', stroke: 'var(--viz-eval-bg)', strokeWidth: 2 }}
+                >
+                  <title>
+                    {moveLabel(m)} : {MOVE_CLASS_LABELS[m.cls]}
+                  </title>
+                </circle>
+              )}
             />
           ))}
         </AreaChart>
       </ResponsiveContainer>
-      <p className="muted" style={{ fontSize: '0.85rem', margin: '0.3rem 0 0' }}>
-        Points : <span style={{ color: 'var(--bad)' }}>●</span> gaffe / coup manqué, <span style={{ color: 'var(--warn)' }}>●</span> erreur (gros points = tes
-        coups).
-      </p>
+      {shown.length > 0 && (
+        <div className="eval-legend">
+          {shown.map((c) => (
+            <span key={c} className={`cls-${c}`}>
+              <i /> {MOVE_CLASS_LABELS[c]}
+            </span>
+          ))}
+          <span>Gros points : tes coups</span>
+        </div>
+      )}
     </ChartCard>
   );
 }

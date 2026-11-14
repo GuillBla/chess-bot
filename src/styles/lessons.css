@@ -1,51 +1,287 @@
-/* === Lessons === */
-.lessons .lesson-level { margin-top: 1rem; }
-.lesson-card { display: flex; flex-direction: column; gap: 0.5rem; }
-.lesson-card h3 { margin: 0; }
-.lesson-progress { display: flex; align-items: center; gap: 0.6rem; margin-top: auto; }
-.lesson-progress-bar { flex: 1; height: 6px; background: var(--surface-2); border-radius: 999px; overflow: hidden; }
-.lesson-progress-bar span { display: block; height: 100%; background: var(--accent); transition: width 0.3s; }
-.lesson { display: flex; flex-direction: column; gap: 1rem; }
-.lesson-breadcrumb a { text-decoration: none; }
-.lesson-header .lead { margin: 0.25rem 0 0; }
-.lesson-title { font-size: 1.5rem; margin: 0.4rem 0 0; }
-.lesson-text h3 { margin-top: 0.5rem; }
-.lesson-pos { margin: 0; }
-.lesson-pos-title { margin: 0 0 0.75rem; }
-.lesson-pos-grid, .lesson-ex-grid {
-  display: grid; grid-template-columns: minmax(0, 480px) minmax(0, 1fr); gap: 1.25rem; align-items: start;
+/* =====================================================================
+   Professeur : leçons mises en page comme un livre d'échecs.
+   Table des matières (parties / chapitres), chapitre (colonne de lecture,
+   lettrine, diagrammes numérotés, feuille de notation), exercices.
+   Couleurs : uniquement les tokens de base.css (clair et « bois verni »).
+   ===================================================================== */
+
+/* ---------- En-tête de la page Professeur ---------- */
+.teacher-head .lead { margin: 0.35rem 0 0; }
+.teacher-page.is-reading .teacher-head h1 { font-size: 1.45rem; }
+.teacher-tabs { margin-bottom: 0.25rem; }
+
+/* ---------- Feuille de livre (surface commune TOC + chapitre) ---------- */
+.book-sheet {
+  width: 100%; min-width: 0; margin-inline: auto;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow);
+  padding: clamp(1.25rem, 4vw, 3rem) clamp(1rem, 5vw, 3.5rem);
 }
-.lesson-board { min-width: 0; }
-.lesson-stepper { justify-content: center; align-items: center; margin-top: 0.6rem; }
-.lesson-stepper .btn { min-width: 2.6rem; padding: 0.4rem 0.6rem; }
-.lesson-step-count { min-width: 3.5rem; text-align: center; color: var(--muted); }
-.lesson-pos-text p { margin: 0 0 0.6rem; }
-.lesson-turn { display: flex; gap: 0.4rem; flex-wrap: wrap; align-items: center; margin: 0 0 0.5rem; font-weight: 600; }
-.lesson-movelist { display: flex; flex-wrap: wrap; gap: 2px 4px; font-size: 0.88rem; }
-.lesson-movelist button {
-  background: none; border: 1px solid transparent; color: var(--text); padding: 1px 6px; border-radius: 6px; cursor: pointer; font: inherit;
+.book-toc .visually-hidden {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
 }
-.lesson-movelist button:hover { border-color: var(--border); }
-.lesson-movelist button.current { background: var(--accent); color: var(--accent-contrast); }
-.lesson-exercises h3 { margin-bottom: 0.5rem; }
-.lesson-ex-tabs { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 0.75rem; }
-.lesson-ex-tabs .btn { min-width: 2.75rem; }
-.lesson-ex-side h3 { margin-top: 0; }
-.lesson-ex-side .btn-row { margin: 0.5rem 0; }
-.lesson-msg { padding: 0.5rem 0.7rem; border-radius: 8px; background: var(--surface-2); display: flex; gap: 0.5rem; align-items: center; }
-.lesson-msg.good { background: color-mix(in srgb, var(--good) 15%, transparent); color: var(--text); border-left: 4px solid var(--good); }
-.lesson-msg.bad { background: color-mix(in srgb, var(--bad) 13%, transparent); border-left: 4px solid var(--bad); }
-.lesson-msg.idea { background: color-mix(in srgb, var(--idea) 13%, transparent); border-left: 4px solid var(--idea); }
-.lesson-line { font-size: 0.9rem; color: var(--muted); overflow-wrap: anywhere; }
-.lesson-explain { border-top: 1px solid var(--border); margin-top: 0.75rem; padding-top: 0.5rem; }
-.lesson-explain h4 { margin: 0 0 0.4rem; }
-.lesson-ex-next { justify-content: flex-end; margin-top: 0.75rem; }
-.lesson-pager { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 0.5rem; }
-.lesson-pager .card { display: flex; flex-direction: column; gap: 0.2rem; }
-.lesson-pager-next { text-align: right; }
-.lesson .small, .lessons .small { font-size: 0.85rem; }
-@media (max-width: 760px) {
-  .lesson-pos-grid, .lesson-ex-grid { grid-template-columns: minmax(0, 1fr); }
-  .lesson-pager { grid-template-columns: 1fr; }
-  .lesson-pager-next { text-align: left; }
+
+/* Fine règle de progression en laiton */
+.book-progress {
+  display: block; flex: 1 1 4rem; min-width: 3rem; max-width: 10rem; height: 4px; border-radius: 2px; overflow: hidden;
+  background: var(--surface-2); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--border) 60%, transparent);
+}
+.book-progress > span { display: block; height: 100%; background: var(--brass); transition: width 0.3s ease; }
+
+/* =====================================================================
+   Table des matières
+   ===================================================================== */
+.book-toc { display: grid; gap: 1.25rem; min-width: 0; }
+.toc-sheet { max-width: 860px; }
+
+/* Reprendre la lecture */
+.toc-resume {
+  max-width: 860px; width: 100%; margin-inline: auto;
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem 1.25rem;
+  padding: 1rem 1.2rem; border: 1px solid var(--border); border-left: 4px solid var(--brass); border-radius: var(--radius);
+  background: var(--surface); box-shadow: var(--shadow); color: var(--text); text-decoration: none;
+  transition: border-color 0.15s;
+}
+.toc-resume:hover { border-color: var(--brass); }
+.toc-resume-text { display: grid; gap: 0.25rem; flex: 1 1 16rem; min-width: 0; }
+.toc-resume-title { font-family: var(--display); font-size: 1.3rem; font-weight: 700; line-height: 1.2; text-wrap: balance; }
+.toc-resume-num { color: var(--accent); font-weight: 500; margin-right: 0.25rem; }
+.toc-resume-meta { display: flex; align-items: center; gap: 0.6rem; font-size: 0.85rem; color: var(--muted); }
+.toc-resume-cta { flex: none; }
+
+/* Titre de la table */
+.toc-head { text-align: center; }
+.toc-head h2 { margin: 0; font-size: clamp(1.6rem, 3.5vw, 2.1rem); letter-spacing: 0.01em; }
+.toc-lede { margin: 0.6rem auto 0; max-width: 60ch; color: var(--muted); font-size: 1rem; text-wrap: pretty; }
+.toc-overall { display: flex; align-items: center; justify-content: center; gap: 0.75rem; margin: 1rem auto 0; max-width: 26rem; font-size: 0.9rem; }
+.toc-overall .book-progress { max-width: 12rem; }
+
+/* Parties */
+.toc-part { margin-top: 2.25rem; }
+.toc-part-head h3 {
+  display: flex; align-items: center; gap: 0.9rem; margin: 0;
+  font-size: 1.2rem; letter-spacing: 0.02em; color: var(--text);
+}
+.toc-part-head h3::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+.toc-part-head p { margin: 0.3rem 0 0.4rem; color: var(--muted); font-family: var(--display); font-style: italic; font-size: 1rem; max-width: 62ch; }
+
+/* Chapitres */
+.toc-list { list-style: none; margin: 0; padding: 0; }
+.toc-list li + li { border-top: 1px solid var(--ruled); }
+.toc-entry {
+  display: grid; grid-template-columns: 3rem minmax(0, 1fr); gap: 1rem; align-items: start;
+  padding: 0.95rem 0.6rem; border-radius: 6px; color: var(--text); text-decoration: none;
+  transition: background 0.15s;
+}
+.toc-entry:hover { background: color-mix(in srgb, var(--surface-2) 55%, transparent); }
+.toc-entry:hover .toc-title { color: var(--accent); }
+.toc-num {
+  font-family: var(--display); font-weight: 700; font-size: 2rem; line-height: 1; text-align: right;
+  color: var(--accent); padding-top: 0.05rem;
+}
+.toc-entry.is-done .toc-num { color: var(--good); }
+.toc-body { display: grid; gap: 0.2rem; min-width: 0; }
+.toc-title { font-family: var(--display); font-weight: 700; font-size: 1.2rem; line-height: 1.25; text-wrap: balance; transition: color 0.15s; }
+.toc-summary { color: var(--muted); font-size: 0.97rem; line-height: 1.5; text-wrap: pretty; }
+.toc-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 0.4rem 0.65rem; margin-top: 0.3rem; font-size: 0.85rem; color: var(--muted); }
+.toc-count { font-variant-numeric: lining-nums; }
+.toc-frac { font-size: 0.8rem; }
+
+/* =====================================================================
+   Chapitre
+   ===================================================================== */
+.book { max-width: 1080px; display: flow-root; }
+/* Colonne de lecture (~68 caractères) ; les diagrammes et exercices prennent toute la largeur de la page. */
+.book-crumb, .chapter-head, .book-text, .book-pager, .ex-section-head { max-width: 68ch; margin-inline: auto; }
+
+.book-crumb {
+  display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 0.25rem 1rem;
+  font-size: 0.92rem; margin-bottom: 1.5rem;
+}
+.book-crumb a { text-decoration: none; }
+.book-crumb a:hover { text-decoration: underline; }
+.book-crumb-part { font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+
+/* Ouverture de chapitre */
+.chapter-head { text-align: center; margin-bottom: 2rem; }
+.chapter-kicker {
+  display: block; font-family: var(--display); font-size: 1.05rem; font-weight: 500; letter-spacing: 0.14em;
+  font-variant-caps: all-small-caps; color: var(--accent);
+}
+.chapter-title { font-size: clamp(1.7rem, 4vw, 2.5rem); line-height: 1.12; margin: 0.25rem 0 0.75rem; letter-spacing: -0.005em; }
+.chapter-standfirst {
+  margin: 0 auto; max-width: 56ch; font-family: var(--display); font-style: italic; font-weight: 500;
+  font-size: 1.16rem; line-height: 1.5; color: var(--muted); text-wrap: pretty;
+}
+.chapter-ornament { display: flex; align-items: center; gap: 0.6rem; width: 8rem; margin: 1.4rem auto 0; }
+.chapter-ornament::before, .chapter-ornament::after { content: ''; flex: 1; height: 1px; background: var(--brass); }
+.chapter-ornament i { width: 7px; height: 7px; background: var(--brass); transform: rotate(45deg); }
+
+/* Texte courant */
+.book-text { margin-block: 0 1.25rem; }
+.book-text h3 { font-size: 1.35rem; margin: 2rem 0 0.6rem; }
+.book-text p {
+  margin: 0; font-size: 1.08rem; line-height: 1.68; hyphens: auto; -webkit-hyphens: auto; text-wrap: pretty; overflow-wrap: break-word;
+}
+/* Usage typographique du livre : pas de blanc entre paragraphes, alinéa en tête des suivants. */
+.book-text p + p { text-indent: 1.4em; margin-top: 0.2rem; }
+.book-text strong { font-weight: 700; }
+/* Lettrine discrète : deux lignes, laiton foncé. */
+.book-text p.has-dropcap::first-letter {
+  float: left; font-family: var(--display); font-weight: 700; color: var(--accent);
+  font-size: 3.45em; line-height: 0.8; margin: 0.08em 0.1em 0 0;
+}
+@media (min-width: 760px) {
+  .book-text p { text-align: justify; }
+}
+
+/* ---------- Diagrammes ---------- */
+.diagram {
+  margin: 2rem 0; padding-block: 1.5rem;
+  border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+  display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.25rem 2.25rem; align-items: start;
+}
+.diagram > * { min-width: 0; }
+.diagram + .diagram { margin-top: -1px; } /* deux diagrammes consécutifs partagent leur filet */
+.diagram-plate .board-wrap { margin-inline: auto; }
+.diagram-caption { display: grid; gap: 0.1rem; margin-top: 0.7rem; text-align: center; font-size: 0.95rem; line-height: 1.35; }
+.diagram-num { font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); }
+.diagram-title { font-family: var(--display); font-style: italic; font-weight: 500; font-size: 1.05rem; color: var(--text); text-wrap: balance; }
+.diagram-source { font-size: 0.88rem; color: var(--muted); font-variant-numeric: oldstyle-nums; }
+.diagram-caption .diagram-source::before { content: '— '; }
+
+.diagram-commentary { display: grid; gap: 0.75rem; align-content: start; }
+.diagram-turn { margin: 0; min-height: 1.9rem; display: flex; align-items: center; }
+.diagram-move {
+  display: inline-block; padding: 0.15rem 0.55rem; border-radius: 4px; font-size: 0.92rem; font-weight: 600;
+  background: var(--brass); color: var(--brass-text);
+}
+.diagram-text { margin: 0; font-size: 1.04rem; line-height: 1.62; min-height: 4.8em; text-wrap: pretty; overflow-wrap: break-word; }
+
+/* Indicateur du camp au trait */
+.turn-ind {
+  display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.14rem 0.65rem 0.14rem 0.3rem;
+  border: 1px solid var(--border); border-radius: 999px; background: var(--surface-2);
+  font-size: 0.9rem; font-weight: 600; color: var(--text); line-height: 1.3;
+}
+.turn-ind img { flex: none; }
+
+/* Rejeu : commandes + feuille de notation */
+.diagram-replay { display: grid; gap: 0.6rem; justify-items: start; }
+.replay-controls {
+  display: inline-flex; align-items: stretch; border: 1px solid var(--border); border-radius: 6px; overflow: hidden;
+  background: var(--surface);
+}
+.replay-btn {
+  display: grid; place-items: center; width: 2.6rem; height: 2.3rem; padding: 0; border: 0; border-right: 1px solid var(--border);
+  background: transparent; color: var(--text); cursor: pointer; font: inherit;
+}
+.replay-btn:last-child { border-right: 0; }
+.replay-btn:hover:not(:disabled) { background: var(--surface-2); color: var(--accent); }
+.replay-btn:disabled { color: var(--muted); opacity: 0.45; cursor: default; }
+.replay-btn:focus-visible { outline-offset: -3px; }
+.replay-count {
+  display: grid; place-items: center; min-width: 3.6rem; padding: 0 0.5rem; border-right: 1px solid var(--border);
+  font-size: 0.82rem; color: var(--muted); font-variant-numeric: tabular-nums;
+}
+.diagram-sheet { width: 100%; max-width: 22rem; max-height: 13.5rem; }
+.diagram-sheet .sheet-empty { color: var(--muted); padding: 0 0.5rem; margin: 0 2px; }
+
+@media (min-width: 900px) {
+  .diagram { grid-template-columns: minmax(0, 440px) minmax(16rem, 1fr); }
+}
+
+/* ---------- Exercices ---------- */
+.book-exercises { margin-top: 2.75rem; }
+.ex-section-head { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 0.25rem 1rem; }
+.ex-section-head h3 { margin: 0; font-size: 1.5rem; }
+.ex-section-head .muted { font-size: 0.92rem; }
+
+.ex-tabs { display: flex; flex-wrap: wrap; gap: 0.4rem; max-width: 68ch; margin: 0.75rem auto 1rem; }
+.ex-tab {
+  position: relative; display: inline-grid; place-items: center; min-width: 2.5rem; height: 2.3rem; padding: 0 0.6rem;
+  border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text);
+  font-family: var(--mono); font-size: 0.9rem; font-weight: 600; cursor: pointer; transition: border-color 0.15s, background 0.15s;
+}
+.ex-tab:hover { border-color: var(--brass); }
+.ex-tab.is-solved { color: var(--good); border-color: color-mix(in srgb, var(--good) 45%, var(--border)); }
+.ex-tab.is-current { background: var(--brass); border-color: var(--brass); color: var(--brass-text); }
+.ex-tab-check { position: absolute; top: 2px; right: 2px; }
+
+/* Carte « À toi de jouer » */
+.ex-card { border-top: 3px solid var(--brass); padding: 1.1rem 1.25rem 1.25rem; transition: border-color 0.2s; }
+.ex-card.is-solved { border-color: color-mix(in srgb, var(--good) 45%, var(--border)); border-top-color: var(--good); }
+.ex-card.is-wrong { border-top-color: var(--bad); }
+.ex-card.is-revealed { border-top-color: var(--idea); }
+.ex-head { display: grid; gap: 0.45rem; margin-bottom: 1rem; }
+.ex-head-row { display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; }
+.ex-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.25rem 1.75rem; align-items: start; }
+.ex-grid > * { min-width: 0; }
+.ex-board .board-wrap { margin-inline: auto; }
+.ex-side { display: grid; gap: 0.7rem; align-content: start; }
+.ex-title { margin: 0; display: grid; gap: 0.1rem; font-family: var(--display); font-size: 1.15rem; font-weight: 700; line-height: 1.25; }
+.ex-title .diagram-source { font-family: var(--font); font-weight: 400; }
+.ex-prompt { margin: 0; font-size: 1.04rem; line-height: 1.6; text-wrap: pretty; }
+.ex-msg {
+  margin: 0; display: flex; align-items: flex-start; gap: 0.55rem; padding: 0.55rem 0.8rem;
+  border-radius: 0 6px 6px 0; border-left: 3px solid var(--border); background: var(--surface-2); color: var(--text); line-height: 1.45;
+}
+.ex-msg .spinner { flex: none; margin-top: 0.15rem; }
+.ex-msg.is-good { border-left-color: var(--good); background: color-mix(in srgb, var(--good) 13%, var(--surface)); }
+.ex-msg.is-bad { border-left-color: var(--bad); background: color-mix(in srgb, var(--bad) 12%, var(--surface)); }
+.ex-msg.is-hint { border-left-color: var(--brass); background: color-mix(in srgb, var(--brass) 17%, var(--surface)); }
+.ex-msg.is-idea { border-left-color: var(--idea); background: color-mix(in srgb, var(--idea) 12%, var(--surface)); }
+.ex-line {
+  margin: 0; padding: 0.45rem 0.7rem; border-radius: 6px; background: var(--surface-2);
+  font-size: 0.86rem; line-height: 1.55; color: var(--text); overflow-wrap: anywhere;
+}
+.ex-actions { margin: 0.1rem 0; }
+.ex-explain { display: grid; gap: 0.55rem; border-top: 1px solid var(--border); padding-top: 0.85rem; margin-top: 0.2rem; }
+.ex-explain h5 { margin: 0; font-family: var(--display); font-size: 1.08rem; font-weight: 700; }
+.ex-explain p { margin: 0; line-height: 1.6; text-wrap: pretty; }
+.ex-next { display: flex; justify-content: flex-end; padding-top: 0.25rem; }
+@media (min-width: 900px) {
+  .ex-grid { grid-template-columns: minmax(0, 460px) minmax(16rem, 1fr); }
+}
+
+/* Encart de fin de chapitre */
+.chapter-done {
+  margin-top: 1.25rem; display: flex; align-items: center; flex-wrap: wrap; gap: 0.75rem 1rem;
+  padding: 1rem 1.2rem; border-radius: var(--radius);
+  border: 1px solid color-mix(in srgb, var(--good) 45%, var(--border));
+  background: color-mix(in srgb, var(--good) 9%, var(--surface));
+}
+.chapter-done > div { flex: 1 1 14rem; min-width: 0; }
+.chapter-done strong { font-family: var(--display); font-size: 1.2rem; }
+.chapter-done p { margin: 0.1rem 0 0; color: var(--muted); }
+.chapter-done-seal {
+  flex: none; display: grid; place-items: center; width: 2.6rem; height: 2.6rem; border-radius: 50%;
+  background: var(--good); color: var(--surface);
+}
+
+/* Pied de page : chapitres précédent / suivant */
+.book-pager {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1rem;
+  margin-top: 3rem; padding-top: 1.25rem; border-top: 1px solid var(--border);
+}
+.book-pager-link { display: grid; gap: 0.2rem; padding: 0.35rem 0.2rem; color: var(--text); text-decoration: none; min-width: 0; }
+.book-pager-link.is-next { grid-column: 2; text-align: right; }
+.book-pager-dir { font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); }
+.book-pager-title { font-family: var(--display); font-weight: 700; font-size: 1.08rem; line-height: 1.25; text-wrap: balance; transition: color 0.15s; }
+.book-pager-link:hover .book-pager-title { color: var(--accent); }
+
+.book-missing { max-width: 68ch; }
+
+/* ---------- Petits écrans : la page devient l'écran, tout s'empile ---------- */
+@media (max-width: 600px) {
+  .book-sheet { padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; }
+  .toc-entry { grid-template-columns: 2.1rem minmax(0, 1fr); gap: 0.7rem; padding-inline: 0.25rem; }
+  .toc-num { font-size: 1.6rem; }
+  .toc-resume-cta { width: 100%; }
+  .chapter-head { margin-bottom: 1.5rem; }
+  .book-text p { font-size: 1.04rem; }
+  .diagram { padding-block: 1.1rem; }
+  .diagram-sheet { max-width: none; }
+  .ex-card { padding: 0.85rem 0.75rem 1rem; }
+  .book-pager { grid-template-columns: minmax(0, 1fr); }
+  .book-pager-link.is-next { grid-column: 1; text-align: left; }
 }

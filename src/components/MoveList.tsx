@@ -1,4 +1,6 @@
 import { useEffect, useRef } from 'react';
+import { MOVE_CLASS_LABELS, type MoveClass } from '../analysis/classify';
+import { sheetSymbol } from './play/moveClass';
 
 export interface MoveListProps {
   /** Coups en notation SAN, dans l'ordre. */
@@ -10,16 +12,28 @@ export interface MoveListProps {
   startTurn?: 'w' | 'b';
   /** Numéro du premier coup (défaut : 1). */
   startMoveNumber?: number;
+  /** Classification de chaque demi-coup (même index que `sans`) : pastille ?!, ?, ?? à côté du coup. */
+  classes?: (MoveClass | null | undefined)[];
 }
 
-/** Liste des coups par paires (1. e4 e5 2. Cf3…), cliquable pour naviguer. */
-export default function MoveList({ sans, current, onSelect, startTurn = 'w', startMoveNumber = 1 }: MoveListProps) {
+/** Feuille de notation (1. e4 e5 2. Cf3…), cliquable pour naviguer, avec défilement vers le coup courant. */
+export default function MoveList({ sans, current, onSelect, startTurn = 'w', startMoveNumber = 1, classes }: MoveListProps) {
   const ref = useRef<HTMLDivElement>(null);
 
+  // Défilement interne à la feuille (sans faire défiler toute la page).
   useEffect(() => {
-    const el = ref.current?.querySelector('button.current');
-    if (el && 'scrollIntoView' in el) (el as HTMLElement).scrollIntoView({ block: 'nearest' });
-  }, [current]);
+    const box = ref.current;
+    const el = box?.querySelector<HTMLElement>('button.current');
+    if (!box) return;
+    if (!el) {
+      if (current <= 0) box.scrollTop = 0;
+      return;
+    }
+    const top = el.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop;
+    const bottom = top + el.offsetHeight;
+    if (top < box.scrollTop) box.scrollTop = Math.max(0, top - el.offsetHeight);
+    else if (bottom > box.scrollTop + box.clientHeight) box.scrollTop = bottom - box.clientHeight + el.offsetHeight;
+  }, [current, sans.length]);
 
   // Décalage si la partie commence avec les Noirs au trait.
   const offset = startTurn === 'b' ? 1 : 0;
@@ -32,14 +46,27 @@ export default function MoveList({ sans, current, onSelect, startTurn = 'w', sta
     else rows[row].black = i;
   }
 
-  const cell = (i?: number) =>
-    i === undefined ? (
-      <span />
-    ) : (
-      <button type="button" className={current === i + 1 ? 'current' : ''} onClick={() => onSelect(i + 1)}>
-        {sans[i]}
+  const cell = (i?: number) => {
+    if (i === undefined) return <span />;
+    const cls = classes?.[i] ?? null;
+    const sym = sheetSymbol(cls);
+    return (
+      <button
+        type="button"
+        className={current === i + 1 ? 'current' : ''}
+        onClick={() => onSelect(i + 1)}
+        aria-current={current === i + 1 ? 'step' : undefined}
+        title={cls ? MOVE_CLASS_LABELS[cls] : undefined}
+      >
+        <span className="ml-san">{sans[i]}</span>
+        {sym && cls && (
+          <span className={`cls-chip cls-${cls}`} aria-label={MOVE_CLASS_LABELS[cls]}>
+            {sym}
+          </span>
+        )}
       </button>
     );
+  };
 
   if (!sans.length) return <p className="muted" style={{ margin: 0 }}>Aucun coup joué.</p>;
 

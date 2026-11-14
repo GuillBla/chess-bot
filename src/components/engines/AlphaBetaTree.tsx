@@ -148,6 +148,7 @@ export default function AlphaBetaTree() {
 
   return (
     <figure className="eng-figure">
+      <div className="eng-svg-scroll">
       <svg className="eng-svg" viewBox={`0 0 ${W} 312`} role="img" aria-label="Arbre minimax avec coupures alpha-bêta">
         {placed
           .filter((p) => p.parent)
@@ -193,6 +194,7 @@ export default function AlphaBetaTree() {
           );
         })}
       </svg>
+      </div>
       <div className="ab-panel">
         <div className="ab-msg" aria-live="polite">
           <strong>

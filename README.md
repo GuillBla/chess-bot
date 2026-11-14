@@ -42,3 +42,5 @@ npm run build    # build de production dans dist/
 
 Ce projet est distribué sous licence **GNU GPL v3 ou ultérieure** (voir [`LICENSE`](LICENSE)).
 Il embarque [Stockfish](https://stockfishchess.org/) 17.1 (WebAssembly, via le paquet npm `stockfish`), lui-même sous GPLv3 ; son code source est disponible sur https://github.com/official-stockfish/Stockfish.
+
+Les pièces d'échecs SVG sont le jeu « cburnett » de Colin M.L. Burnett (GPLv2 ou ultérieure), tel que distribué par [Lichess](https://github.com/lichess-org/lila/tree/master/public/piece/cburnett).

@@ -1,16 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Line,
-  LineChart,
-  ReferenceLine,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts';
+import { Area, AreaChart, Bar, BarChart, CartesianGrid, Label, ReferenceDot, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import {
   ChessComError,
   TIME_CLASS_LABELS,
@@ -29,7 +18,20 @@ import {
   type RatingStats,
   type TimeClass,
 } from '../api/chesscom';
-import { AXIS_PROPS, ChartCard, GRID_PROPS, Legend, TIME_CLASS_COLORS, TooltipBox, WDL_COLORS, fmtPct } from '../components/stats/chartKit';
+import { PieceIcon } from '../components/pieces';
+import {
+  AXIS_PROPS,
+  ChartCard,
+  GRID_PROPS,
+  Legend,
+  ResultPill,
+  Seg,
+  TIME_CLASS_COLORS,
+  TooltipBox,
+  WDL_COLORS,
+  fmtPct,
+  fmtSigned,
+} from '../components/stats/chartKit';
 import WdlChart from '../components/stats/WdlChart';
 import {
   TIME_CLASSES,
@@ -38,9 +40,13 @@ import {
   byEloGap,
   byTimeClass,
   endReasons,
+  favoriteOpening,
   insights,
+  ratingDelta,
   ratingSeries,
+  streaks,
   topOpenings,
+  weakPoint,
   type OpeningRow,
 } from '../components/stats/profileStats';
 
@@ -50,8 +56,17 @@ const PERIODS: { id: Period; label: string }[] = [
   { id: '1y', label: '1 an' },
   { id: 'all', label: 'Tout' },
 ];
+const PERIOD_TEXT: Record<Period, string> = { '3m': 'sur 3 mois', '1y': 'sur 1 an', all: 'depuis le début' };
+
+const STATS_KEY: Record<TimeClass, keyof PlayerStats> = {
+  rapid: 'chess_rapid',
+  blitz: 'chess_blitz',
+  bullet: 'chess_bullet',
+  daily: 'chess_daily',
+};
 
 const fmtDate = (ms: number) => new Date(ms).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+const fmtMonth = (ms: number) => new Date(ms).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
 const fmtShortDate = (ms: number) => new Date(ms).toLocaleDateString('fr-FR', { month: 'short', year: '2-digit' });
 
 export default function Profile() {
@@ -66,6 +81,7 @@ export default function Profile() {
   const [error, setError] = useState<string | null>(null);
   const [period, setPeriod] = useState<Period>('1y');
   const [tcFilter, setTcFilter] = useState<TimeClass | 'all'>('all');
+  const [curveTc, setCurveTc] = useState<TimeClass | null>(null);
 
   useEffect(() => {
     const ctrl = new AbortController();
@@ -107,6 +123,7 @@ export default function Profile() {
     if (!u) return;
     setStoredUsername(u);
     setReloadKey(0);
+    setCurveTc(null);
     setUser(u);
   };
 
@@ -121,6 +138,9 @@ export default function Profile() {
   }, [period]);
   const series = useMemo(() => ratingSeries(all, since), [all, since]);
   const seriesClasses = TIME_CLASSES.filter((tc) => series[tc].length > 1);
+  // Cadence affichée par la courbe : choix explicite, sinon la plus jouée sur la période.
+  const shownTc: TimeClass | null =
+    curveTc && series[curveTc].length > 1 ? curveTc : ([...seriesClasses].sort((a, b) => series[b].length - series[a].length)[0] ?? null);
 
   const colorRows = useMemo(() => byColor(filtered), [filtered]);
   const tcRows = useMemo(() => byTimeClass(all), [all]);
@@ -131,6 +151,9 @@ export default function Profile() {
   const gap = useMemo(() => byEloGap(filtered), [filtered]);
   const activity = useMemo(() => activityByMonth(filtered), [filtered]);
   const tips = useMemo(() => insights(filtered), [filtered]);
+  const fav = useMemo(() => favoriteOpening(filtered), [filtered]);
+  const weak = useMemo(() => weakPoint(filtered), [filtered]);
+  const streak = useMemo(() => streaks(filtered), [filtered]);
   const activityClasses = TIME_CLASSES.filter((tc) => activity.some((a) => a[tc] > 0));
 
   const loadingText = progress
@@ -139,22 +162,14 @@ export default function Profile() {
 
   return (
     <div className="page stats-page">
-      <h1>Mes statistiques</h1>
-      <form className="stats-userform" onSubmit={onSubmit}>
-        <label htmlFor="cc-user">Pseudo chess.com</label>
-        <input id="cc-user" type="text" value={input} onChange={(e) => setInput(e.target.value)} autoComplete="off" spellCheck={false} />
-        <button className="btn primary" type="submit">
-          Charger
-        </button>
-        <button
-          className="btn"
-          type="button"
-          onClick={() => setReloadKey((k) => k + 1)}
-          title="Recharge le profil, les stats et le mois en cours depuis chess.com (les mois terminés restent en cache)"
-        >
-          Actualiser
-        </button>
-      </form>
+      <PlayerHeader
+        profile={profile}
+        user={user}
+        input={input}
+        setInput={setInput}
+        onSubmit={onSubmit}
+        onReload={() => setReloadKey((k) => k + 1)}
+      />
 
       {error && (
         <div className="card stats-error" role="alert">
@@ -168,7 +183,16 @@ export default function Profile() {
         </div>
       )}
 
-      {profile && stats && <ProfileHeader profile={profile} stats={stats} />}
+      {stats && (
+        <RatingPlates
+          stats={stats}
+          series={series}
+          period={period}
+          selected={shownTc}
+          onSelect={(tc) => setCurveTc(tc)}
+          selectable={(tc) => series[tc].length > 1}
+        />
+      )}
 
       {profile && (
         <>
@@ -181,83 +205,108 @@ export default function Profile() {
 
           {all.length > 0 && (
             <>
-              <ChartCard
-                title="Évolution de l'Elo"
-                subtitle="Parties classées, par cadence"
-                actions={
-                  <div className="seg" role="group" aria-label="Période">
-                    {PERIODS.map((p) => (
-                      <button key={p.id} className={period === p.id ? 'active' : ''} onClick={() => setPeriod(p.id)} type="button">
-                        {p.label}
-                      </button>
-                    ))}
-                  </div>
-                }
-              >
-                {seriesClasses.length === 0 ? (
-                  <p className="muted">Pas assez de parties classées sur cette période.</p>
-                ) : (
-                  <>
-                    <Legend items={seriesClasses.map((tc) => ({ color: TIME_CLASS_COLORS[tc], label: TIME_CLASS_LABELS[tc] }))} />
-                    <ResponsiveContainer width="100%" height={300}>
-                      <LineChart margin={{ top: 8, right: 16, bottom: 0, left: 0 }}>
-                        <CartesianGrid {...GRID_PROPS} />
-                        <XAxis dataKey="t" type="number" scale="time" domain={['dataMin', 'dataMax']} tickFormatter={fmtShortDate} {...AXIS_PROPS} minTickGap={30} />
-                        <YAxis domain={['auto', 'auto']} width={48} {...AXIS_PROPS} axisLine={false} />
-                        <Tooltip
-                          cursor={{ stroke: 'var(--viz-axis)', strokeWidth: 1 }}
-                          content={({ active, payload }) => {
-                            if (!active || !payload?.length) return null;
-                            const t = (payload[0].payload as { t: number }).t;
-                            return (
-                              <TooltipBox
-                                title={fmtDate(t)}
-                                rows={payload.map((p) => ({ color: String(p.color), label: String(p.name), value: String(p.value) }))}
-                              />
-                            );
-                          }}
-                        />
-                        {seriesClasses.map((tc) => (
-                          <Line
-                            key={tc}
-                            data={series[tc]}
-                            dataKey="rating"
-                            name={TIME_CLASS_LABELS[tc]}
-                            stroke={TIME_CLASS_COLORS[tc]}
-                            strokeWidth={2}
-                            dot={false}
-                            activeDot={{ r: 4, stroke: 'var(--surface)', strokeWidth: 2 }}
-                            isAnimationActive={false}
-                            type="monotone"
-                          />
-                        ))}
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </>
-                )}
-              </ChartCard>
+              <EloCurve
+                tc={shownTc}
+                points={shownTc ? series[shownTc] : []}
+                classes={seriesClasses}
+                onTc={setCurveTc}
+                period={period}
+                onPeriod={setPeriod}
+              />
 
               <div className="stats-filter">
-                <span className="muted">Filtrer les statistiques ci-dessous :</span>
-                <div className="seg" role="group" aria-label="Cadence">
-                  <button type="button" className={tcFilter === 'all' ? 'active' : ''} onClick={() => setTcFilter('all')}>
-                    Toutes
-                  </button>
-                  {TIME_CLASSES.filter((tc) => all.some((g) => g.timeClass === tc)).map((tc) => (
-                    <button type="button" key={tc} className={tcFilter === tc ? 'active' : ''} onClick={() => setTcFilter(tc)}>
-                      {TIME_CLASS_LABELS[tc]}
-                    </button>
-                  ))}
-                </div>
+                <span className="eyebrow">Filtrer la suite</span>
+                <Seg<TimeClass | 'all'>
+                  label="Cadence"
+                  value={tcFilter}
+                  onChange={setTcFilter}
+                  options={[
+                    { id: 'all', label: 'Toutes' },
+                    ...TIME_CLASSES.filter((tc) => all.some((g) => g.timeClass === tc)).map((tc) => ({ id: tc, label: TIME_CLASS_LABELS[tc] })),
+                  ]}
+                />
                 <span className="muted">{filtered.length} parties</span>
               </div>
 
+              <div className="highlights">
+                <section className="card highlight">
+                  <div className="highlight-head">
+                    <PieceIcon piece="wN" size={22} />
+                    <span className="eyebrow">Ouverture préférée</span>
+                  </div>
+                  {fav ? (
+                    <>
+                      <div className="highlight-title">{fav.name}</div>
+                      <div className="highlight-figure">
+                        {fmtPct(fav.score)}
+                        <small>de score</small>
+                      </div>
+                      <p>
+                        {fav.total} parties avec les {fav.color === 'white' ? 'Blancs' : 'Noirs'} · {fav.win} V · {fav.draw} N · {fav.loss} D
+                        {fav.eco && <span className="mono"> · {fav.eco}</span>}
+                      </p>
+                    </>
+                  ) : (
+                    <p>Pas encore assez de parties.</p>
+                  )}
+                </section>
+
+                <section className="card highlight bad">
+                  <div className="highlight-head">
+                    <PieceIcon piece="bK" size={22} />
+                    <span className="eyebrow">Point faible</span>
+                  </div>
+                  {weak ? (
+                    <>
+                      <div className="highlight-title">{weak.title}</div>
+                      <div className="highlight-figure">{weak.figure}</div>
+                      <p>{weak.detail}</p>
+                    </>
+                  ) : (
+                    <p>Aucun point faible net sur ces parties (ou pas assez de parties pour conclure).</p>
+                  )}
+                </section>
+
+                <section className={`card highlight ${streak.current?.outcome === 'win' ? 'good' : streak.current?.outcome === 'loss' ? 'bad' : ''}`}>
+                  <div className="highlight-head">
+                    <PieceIcon piece="wR" size={22} />
+                    <span className="eyebrow">Série en cours</span>
+                  </div>
+                  {streak.current ? (
+                    <>
+                      <div className="highlight-figure">
+                        {streak.current.count}
+                        <small>
+                          {streak.current.outcome === 'win' ? 'victoire' : streak.current.outcome === 'loss' ? 'défaite' : 'nulle'}
+                          {streak.current.count > 1 ? 's' : ''} d'affilée
+                        </small>
+                      </div>
+                      <div className="streak" aria-label="Dix derniers résultats, du plus récent au plus ancien">
+                        {streak.recent.map((o, i) => (
+                          <ResultPill key={i} outcome={o} small />
+                        ))}
+                      </div>
+                      <p>
+                        Record de la période : {streak.bestWin} victoire{streak.bestWin > 1 ? 's' : ''} de suite. Du plus récent (à gauche) au plus ancien.
+                      </p>
+                    </>
+                  ) : (
+                    <p>Pas de parties.</p>
+                  )}
+                </section>
+              </div>
+
               {tips.length > 0 && (
-                <section className="card">
-                  <h3>Ce que disent tes parties</h3>
-                  <ul className="stats-insights">
+                <section aria-labelledby="tips-title">
+                  <h2 id="tips-title" style={{ marginTop: 0 }}>
+                    Ce que disent tes parties
+                  </h2>
+                  <ul className="insights">
                     {tips.map((t) => (
-                      <li key={t}>{t}</li>
+                      <li key={t.text} className={`insight ${t.tone}`}>
+                        <span className="insight-figure">{t.figure}</span>
+                        <p>{t.text}</p>
+                      </li>
                     ))}
                   </ul>
                 </section>
@@ -270,90 +319,57 @@ export default function Profile() {
                 <ChartCard title="Résultats par cadence" subtitle="Toutes cadences, indépendamment du filtre">
                   <WdlChart rows={tcRows} />
                 </ChartCard>
-              </div>
-
-              <div className="viz-grid">
-                <ChartCard title="Ouvertures avec les Blancs" subtitle="Les plus jouées, score = (V + N/2) / parties">
+                <ChartCard title="Ouvertures avec les Blancs" subtitle="Les plus jouées ; score = (V + N/2) / parties">
                   <OpeningTable rows={openW} />
                 </ChartCard>
-                <ChartCard title="Ouvertures avec les Noirs" subtitle="Les plus jouées, score = (V + N/2) / parties">
+                <ChartCard title="Ouvertures avec les Noirs" subtitle="Les plus jouées ; score = (V + N/2) / parties">
                   <OpeningTable rows={openB} />
                 </ChartCard>
-              </div>
-
-              <div className="viz-grid">
                 <ChartCard title="Comment tu gagnes" subtitle={`${winReasons.reduce((a, r) => a + r.count, 0)} victoires`}>
                   <ReasonChart rows={winReasons} color={WDL_COLORS.win} />
                 </ChartCard>
                 <ChartCard title="Comment tu perds" subtitle={`${lossReasons.reduce((a, r) => a + r.count, 0)} défaites`}>
                   <ReasonChart rows={lossReasons} color={WDL_COLORS.loss} />
                 </ChartCard>
-              </div>
-
-              <ChartCard title="Performance selon l'écart d'Elo" subtitle="Elo adverse − ton Elo ; à droite, adversaires plus forts. Ligne : 50 %.">
-                <ResponsiveContainer width="100%" height={260}>
-                  <BarChart data={gap} margin={{ top: 8, right: 12, bottom: 0, left: 0 }}>
-                    <CartesianGrid {...GRID_PROPS} />
-                    <XAxis dataKey="label" {...AXIS_PROPS} interval={0} tick={{ ...AXIS_PROPS.tick, fontSize: 11 }} />
-                    <YAxis domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} tickFormatter={(v) => `${v} %`} width={48} {...AXIS_PROPS} axisLine={false} />
-                    <ReferenceLine y={50} stroke="var(--viz-axis)" strokeDasharray="4 4" />
-                    <Tooltip
-                      cursor={{ fill: 'var(--viz-hover)' }}
-                      content={({ active, payload }) => {
-                        if (!active || !payload?.length) return null;
-                        const r = payload[0].payload as (typeof gap)[number];
-                        return (
-                          <TooltipBox
-                            title={`Écart ${r.label}`}
-                            rows={[
-                              { color: 'var(--viz-1)', label: 'Score', value: r.total ? fmtPct(r.score) : '—' },
-                              { label: 'Parties', value: r.total },
-                              { label: 'V / N / D', value: `${r.win} / ${r.draw} / ${r.loss}` },
-                            ]}
-                          />
-                        );
-                      }}
-                    />
-                    <Bar dataKey="score" fill="var(--viz-1)" radius={[4, 4, 0, 0]} maxBarSize={48} isAnimationActive={false} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </ChartCard>
-
-              <ChartCard title="Activité par mois" subtitle="Nombre de parties jouées">
-                <Legend items={activityClasses.map((tc) => ({ color: TIME_CLASS_COLORS[tc], label: TIME_CLASS_LABELS[tc] }))} />
-                <ResponsiveContainer width="100%" height={240}>
-                  <BarChart data={activity} margin={{ top: 8, right: 12, bottom: 0, left: 0 }}>
-                    <CartesianGrid {...GRID_PROPS} />
-                    <XAxis dataKey="label" {...AXIS_PROPS} minTickGap={16} />
-                    <YAxis allowDecimals={false} width={40} {...AXIS_PROPS} axisLine={false} />
-                    <Tooltip
-                      cursor={{ fill: 'var(--viz-hover)' }}
-                      content={({ active, payload }) => {
-                        if (!active || !payload?.length) return null;
-                        const r = payload[0].payload as (typeof activity)[number];
-                        return (
-                          <TooltipBox
-                            title={`${r.label} · ${r.total} parties`}
-                            rows={activityClasses.map((tc) => ({ color: TIME_CLASS_COLORS[tc], label: TIME_CLASS_LABELS[tc], value: r[tc] }))}
-                          />
-                        );
-                      }}
-                    />
-                    {activityClasses.map((tc, i) => (
-                      <Bar
-                        key={tc}
-                        dataKey={tc}
-                        stackId="m"
-                        fill={TIME_CLASS_COLORS[tc]}
-                        stroke="var(--surface)"
-                        strokeWidth={activity.length > 40 ? 0 : 1}
-                        radius={i === activityClasses.length - 1 ? [4, 4, 0, 0] : undefined}
-                        isAnimationActive={false}
+                <ChartCard title="Performance selon l'écart d'Elo" subtitle="Elo adverse − ton Elo ; à droite, adversaires plus forts. Pointillé : 50 %.">
+                  <GapChart rows={gap} />
+                </ChartCard>
+                <ChartCard title="Activité par mois" subtitle="Nombre de parties jouées">
+                  <Legend items={activityClasses.map((tc) => ({ color: TIME_CLASS_COLORS[tc], label: TIME_CLASS_LABELS[tc] }))} />
+                  <ResponsiveContainer width="100%" height={240}>
+                    <BarChart data={activity} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+                      <CartesianGrid {...GRID_PROPS} />
+                      <XAxis dataKey="label" {...AXIS_PROPS} minTickGap={16} />
+                      <YAxis allowDecimals={false} width={36} {...AXIS_PROPS} axisLine={false} />
+                      <Tooltip
+                        cursor={{ fill: 'var(--viz-hover)' }}
+                        content={({ active, payload }) => {
+                          if (!active || !payload?.length) return null;
+                          const r = payload[0].payload as (typeof activity)[number];
+                          return (
+                            <TooltipBox
+                              title={`${r.label} · ${r.total} parties`}
+                              rows={activityClasses.map((tc) => ({ color: TIME_CLASS_COLORS[tc], label: TIME_CLASS_LABELS[tc], value: r[tc] }))}
+                            />
+                          );
+                        }}
                       />
-                    ))}
-                  </BarChart>
-                </ResponsiveContainer>
-              </ChartCard>
+                      {activityClasses.map((tc, i) => (
+                        <Bar
+                          key={tc}
+                          dataKey={tc}
+                          stackId="m"
+                          fill={TIME_CLASS_COLORS[tc]}
+                          stroke="var(--surface)"
+                          strokeWidth={activity.length > 40 ? 0 : 1}
+                          radius={i === activityClasses.length - 1 ? [4, 4, 0, 0] : undefined}
+                          isAnimationActive={false}
+                        />
+                      ))}
+                    </BarChart>
+                  </ResponsiveContainer>
+                </ChartCard>
+              </div>
             </>
           )}
 
@@ -364,64 +380,299 @@ export default function Profile() {
   );
 }
 
-function RatingTile({ label, s }: { label: string; s?: RatingStats }) {
-  if (!s) return null;
-  const { win, loss, draw } = s.record;
+// ---------------------------------------------------------------------------
+// En-tête de joueur
+// ---------------------------------------------------------------------------
+
+function PlayerHeader({
+  profile,
+  user,
+  input,
+  setInput,
+  onSubmit,
+  onReload,
+}: {
+  profile: PlayerProfile | null;
+  user: string;
+  input: string;
+  setInput: (v: string) => void;
+  onSubmit: (e: FormEvent) => void;
+  onReload: () => void;
+}) {
+  const cc = profile ? countryCode(profile.country) : '';
+  const country = countryName(cc);
+  const name = profile ? (profile.url.split('/').pop() ?? profile.username) : user;
   return (
-    <div className="stat-tile">
-      <div className="stat-tile-label">{label}</div>
-      <div className="stat-tile-value">{s.last.rating}</div>
-      <div className="stat-tile-meta">
-        {s.best && (
-          <span title={fmtDate(s.best.date * 1000)}>
-            Record : <strong>{s.best.rating}</strong>
-          </span>
+    <header className="player-head">
+      <div className="player-id">
+        {profile?.avatar ? (
+          <img src={profile.avatar} alt="" className="stats-avatar" />
+        ) : (
+          <div className="stats-avatar stats-avatar-empty" aria-hidden>
+            <PieceIcon piece="wK" size={44} />
+          </div>
         )}
-        <span>
-          {win} V · {draw} N · {loss} D
-        </span>
+        <div>
+          <div className="eyebrow">Tableau de bord du joueur</div>
+          <h1>
+            {profile ? (
+              <a href={profile.url} target="_blank" rel="noreferrer" title="Voir le profil sur chess.com">
+                {profile.title && <span className="player-title">{profile.title}</span>}
+                {name}
+              </a>
+            ) : (
+              name
+            )}
+          </h1>
+          {profile && (
+            <div className="player-meta">
+              {cc && (
+                <span>
+                  <span className="player-flag" title={country}>
+                    {cc}
+                  </span>{' '}
+                  {country}
+                </span>
+              )}
+              {profile.location && <span>{profile.location}</span>}
+              <span>Membre depuis {fmtMonth(profile.joined * 1000)}</span>
+              {profile.league && <span>Ligue {profile.league}</span>}
+            </div>
+          )}
+        </div>
       </div>
+      <form className="user-switch" onSubmit={onSubmit}>
+        <label htmlFor="cc-user">Joueur chess.com</label>
+        <input id="cc-user" type="text" value={input} onChange={(e) => setInput(e.target.value)} autoComplete="off" spellCheck={false} />
+        <button className="btn" type="submit">
+          Charger
+        </button>
+        <button
+          className="btn ghost"
+          type="button"
+          onClick={onReload}
+          title="Recharge le profil, les stats et le mois en cours depuis chess.com (les mois terminés restent en cache)"
+          aria-label="Actualiser"
+        >
+          ↻
+        </button>
+      </form>
+    </header>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Plaques de classement
+// ---------------------------------------------------------------------------
+
+function RatingPlates({
+  stats,
+  series,
+  period,
+  selected,
+  onSelect,
+  selectable,
+}: {
+  stats: PlayerStats;
+  series: Record<TimeClass, { t: number; rating: number }[]>;
+  period: Period;
+  selected: TimeClass | null;
+  onSelect: (tc: TimeClass) => void;
+  selectable: (tc: TimeClass) => boolean;
+}) {
+  const tcs = TIME_CLASSES.filter((tc) => stats[STATS_KEY[tc]]);
+  const puzzles = stats.tactics?.highest || stats.puzzle_rush?.best;
+  if (tcs.length === 0 && !puzzles) return null;
+  return (
+    <div className="plates">
+      {tcs.map((tc) => {
+        const s = stats[STATS_KEY[tc]] as RatingStats;
+        const delta = ratingDelta(series[tc]);
+        const can = selectable(tc);
+        return (
+          <button
+            key={tc}
+            type="button"
+            className={`plate ${selected === tc ? 'on' : ''}`}
+            disabled={!can}
+            aria-pressed={selected === tc}
+            onClick={() => onSelect(tc)}
+            title={can ? 'Afficher la courbe de cette cadence' : undefined}
+          >
+            <span className="plate-label">
+              <span className="viz-swatch" style={{ background: TIME_CLASS_COLORS[tc] }} />
+              {TIME_CLASS_LABELS[tc]}
+            </span>
+            <span className="plate-elo">{s.last.rating}</span>
+            <span className="plate-meta">
+              <span title={s.best ? fmtDate(s.best.date * 1000) : undefined}>
+                Record <strong>{s.best?.rating ?? '—'}</strong>
+              </span>
+              {delta !== null && (
+                <span>
+                  <span className={`delta ${delta > 0 ? 'up' : delta < 0 ? 'down' : ''}`}>{fmtSigned(delta)}</span> {PERIOD_TEXT[period]}
+                </span>
+              )}
+            </span>
+            <span className="plate-meta">
+              <span>
+                {s.record.win} V · {s.record.draw} N · {s.record.loss} D
+              </span>
+            </span>
+          </button>
+        );
+      })}
+      {puzzles && (
+        <div className="plate static" aria-label="Problèmes">
+          <span className="plate-label">
+            <PieceIcon piece="wQ" size={14} />
+            Problèmes
+          </span>
+          <span className="plate-elo">{stats.tactics?.highest?.rating ?? '—'}</span>
+          <span className="plate-meta">
+            <span>Record tactique</span>
+            {stats.puzzle_rush?.best && (
+              <span>
+                Puzzle Rush <strong>{stats.puzzle_rush.best.score}</strong>
+              </span>
+            )}
+          </span>
+        </div>
+      )}
     </div>
   );
 }
 
-function ProfileHeader({ profile, stats }: { profile: PlayerProfile; stats: PlayerStats }) {
-  const cc = countryCode(profile.country);
+// ---------------------------------------------------------------------------
+// Courbe d'Elo
+// ---------------------------------------------------------------------------
+
+function EloCurve({
+  tc,
+  points,
+  classes,
+  onTc,
+  period,
+  onPeriod,
+}: {
+  tc: TimeClass | null;
+  points: { t: number; rating: number }[];
+  classes: TimeClass[];
+  onTc: (tc: TimeClass) => void;
+  period: Period;
+  onPeriod: (p: Period) => void;
+}) {
+  const color = tc ? TIME_CLASS_COLORS[tc] : 'var(--viz-1)';
+  const last = points[points.length - 1];
+  const delta = ratingDelta(points);
+  const ratings = points.map((p) => p.rating);
+  const lo = ratings.length ? Math.floor((Math.min(...ratings) - 15) / 50) * 50 : 0;
+  const hi = ratings.length ? Math.ceil((Math.max(...ratings) + 15) / 50) * 50 : 100;
+  const peak = points.reduce<{ t: number; rating: number } | null>((m, p) => (!m || p.rating > m.rating ? p : m), null);
   return (
-    <section className="card stats-header">
-      <div className="stats-identity">
-        {profile.avatar ? <img src={profile.avatar} alt="" className="stats-avatar" /> : <div className="stats-avatar stats-avatar-empty">♟</div>}
-        <div>
-          <h2>
-            <a href={profile.url} target="_blank" rel="noreferrer">
-              {profile.title && <span className="badge idea">{profile.title}</span>} {profile.url.split('/').pop() ?? profile.username}
-            </a>
-          </h2>
-          <p className="muted">
-            {[countryName(cc), profile.location].filter(Boolean).join(' · ')}
-            <br />
-            Inscrit le {fmtDate(profile.joined * 1000)} · vu le {fmtDate(profile.last_online * 1000)}
-            {profile.league && <> · Ligue {profile.league}</>}
-          </p>
+    <ChartCard
+      className="elo-card"
+      title={
+        <span className="elo-head-figure">
+          <span>Courbe d'Elo{tc ? ` · ${TIME_CLASS_LABELS[tc]}` : ''}</span>
+          {last && (
+            <>
+              <span className="big">{last.rating}</span>
+              {delta !== null && (
+                <span className={`delta ${delta > 0 ? 'up' : delta < 0 ? 'down' : ''}`}>
+                  {fmtSigned(delta)} {PERIOD_TEXT[period]}
+                </span>
+              )}
+            </>
+          )}
+        </span>
+      }
+      subtitle={`Parties classées ${PERIOD_TEXT[period]}${points.length ? ` · ${points.length} parties` : ''}`}
+      actions={
+        <div className="elo-controls">
+          {classes.length > 1 && tc && (
+            <Seg<TimeClass> label="Cadence de la courbe" value={tc} onChange={onTc} options={classes.map((c) => ({ id: c, label: TIME_CLASS_LABELS[c] }))} />
+          )}
+          <Seg<Period> label="Période" value={period} onChange={onPeriod} options={PERIODS} />
         </div>
-      </div>
-      <div className="stat-tiles">
-        <RatingTile label="Rapide" s={stats.chess_rapid} />
-        <RatingTile label="Blitz" s={stats.chess_blitz} />
-        <RatingTile label="Bullet" s={stats.chess_bullet} />
-        <RatingTile label="Par jour" s={stats.chess_daily} />
-        {(stats.tactics?.highest || stats.puzzle_rush?.best) && (
-          <div className="stat-tile">
-            <div className="stat-tile-label">Problèmes</div>
-            <div className="stat-tile-value">{stats.tactics?.highest?.rating ?? '—'}</div>
-            <div className="stat-tile-meta">
-              <span>Record tactique</span>
-              {stats.puzzle_rush?.best && <span>Puzzle Rush : {stats.puzzle_rush.best.score}</span>}
-            </div>
-          </div>
-        )}
-      </div>
-    </section>
+      }
+    >
+      {points.length < 2 ? (
+        <p className="muted">Pas assez de parties classées sur cette période.</p>
+      ) : (
+        <ResponsiveContainer width="100%" height={320}>
+          <AreaChart data={points} margin={{ top: 28, right: 28, bottom: 0, left: 0 }}>
+            <CartesianGrid {...GRID_PROPS} />
+            <XAxis dataKey="t" type="number" scale="time" domain={['dataMin', 'dataMax']} tickFormatter={fmtShortDate} {...AXIS_PROPS} minTickGap={36} />
+            <YAxis domain={[lo, hi]} width={44} {...AXIS_PROPS} axisLine={false} allowDecimals={false} />
+            <Tooltip
+              cursor={{ stroke: 'var(--viz-axis)', strokeWidth: 1, strokeDasharray: '3 3' }}
+              content={({ active, payload }) => {
+                if (!active || !payload?.length) return null;
+                const p = payload[0].payload as { t: number; rating: number };
+                return <TooltipBox title={fmtDate(p.t)} rows={[{ color, label: 'Elo', value: p.rating }]} />;
+              }}
+            />
+            {peak && peak !== last && (
+              <ReferenceLine y={peak.rating} stroke="var(--viz-axis-line)" strokeDasharray="4 4">
+                <Label value={`record ${peak.rating}`} position="insideTopLeft" fill="var(--viz-axis)" fontSize={11} />
+              </ReferenceLine>
+            )}
+            <Area
+              type="monotone"
+              dataKey="rating"
+              stroke={color}
+              strokeWidth={2}
+              fill={color}
+              fillOpacity={0.12}
+              dot={false}
+              activeDot={{ r: 5, stroke: 'var(--surface)', strokeWidth: 2, fill: color }}
+              isAnimationActive={false}
+            />
+            {last && (
+              <ReferenceDot x={last.t} y={last.rating} r={6} fill={color} stroke="var(--surface)" strokeWidth={3} ifOverflow="visible">
+                <Label value={last.rating} position="top" offset={10} fill="var(--text)" fontSize={13} fontWeight={700} />
+              </ReferenceDot>
+            )}
+          </AreaChart>
+        </ResponsiveContainer>
+      )}
+    </ChartCard>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Graphiques et tableaux secondaires
+// ---------------------------------------------------------------------------
+
+function GapChart({ rows }: { rows: ReturnType<typeof byEloGap> }) {
+  return (
+    <ResponsiveContainer width="100%" height={260}>
+      <BarChart data={rows} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+        <CartesianGrid {...GRID_PROPS} />
+        <XAxis dataKey="label" {...AXIS_PROPS} interval="preserveStartEnd" tick={{ ...AXIS_PROPS.tick, fontSize: 11 }} />
+        <YAxis domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} tickFormatter={(v) => `${v} %`} width={44} {...AXIS_PROPS} axisLine={false} />
+        <ReferenceLine y={50} stroke="var(--viz-axis)" strokeDasharray="4 4" />
+        <Tooltip
+          cursor={{ fill: 'var(--viz-hover)' }}
+          content={({ active, payload }) => {
+            if (!active || !payload?.length) return null;
+            const r = payload[0].payload as (typeof rows)[number];
+            return (
+              <TooltipBox
+                title={`Écart ${r.label}`}
+                rows={[
+                  { color: 'var(--viz-1)', label: 'Score', value: r.total ? fmtPct(r.score) : '—' },
+                  { label: 'Parties', value: r.total },
+                  { label: 'V / N / D', value: `${r.win} / ${r.draw} / ${r.loss}` },
+                ]}
+              />
+            );
+          }}
+        />
+        <Bar dataKey="score" fill="var(--viz-1)" radius={[4, 4, 0, 0]} maxBarSize={44} isAnimationActive={false} />
+      </BarChart>
+    </ResponsiveContainer>
   );
 }
 
@@ -468,7 +719,7 @@ function ReasonChart({ rows, color }: { rows: { label: string; count: number; pc
     <ResponsiveContainer width="100%" height={rows.length * 34 + 24}>
       <BarChart data={rows} layout="vertical" margin={{ top: 0, right: 40, bottom: 0, left: 0 }} barCategoryGap={8}>
         <XAxis type="number" hide />
-        <YAxis type="category" dataKey="label" width={150} {...AXIS_PROPS} axisLine={false} />
+        <YAxis type="category" dataKey="label" width={130} {...AXIS_PROPS} axisLine={false} />
         <Tooltip
           cursor={{ fill: 'var(--viz-hover)' }}
           content={({ active, payload }) => {
@@ -481,10 +732,12 @@ function ReasonChart({ rows, color }: { rows: { label: string; count: number; pc
           dataKey="count"
           fill={color}
           radius={[0, 4, 4, 0]}
+          maxBarSize={22}
           isAnimationActive={false}
-          label={{ position: 'right', fill: 'var(--viz-axis)', fontSize: 12, formatter: (v: number) => v }}
+          label={{ position: 'right', fill: 'var(--viz-axis)', fontSize: 12 }}
         />
       </BarChart>
     </ResponsiveContainer>
   );
 }
+

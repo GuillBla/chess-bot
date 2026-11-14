@@ -1,1 +1,150 @@
 /* === Accueil === */
+.home { gap: 3.5rem; }
+
+/* ---------- Héros : titre + échiquier vivant ---------- */
+.home-hero {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 560px);
+  gap: 2rem 3.5rem; align-items: center;
+}
+.home-hero > * { min-width: 0; }
+.home-hero-text { display: grid; gap: 1rem; align-content: center; }
+.home-hero h1 {
+  font-size: clamp(2.4rem, 5.2vw, 4rem); font-weight: 800; line-height: 1.02; letter-spacing: -0.02em; margin: 0;
+}
+.home-hero h1 em { font-style: italic; font-weight: 500; color: var(--accent); }
+.home-hero-lead { font-size: 1.18rem; color: var(--muted); max-width: 46ch; margin: 0; }
+.home-hero-actions { margin-top: 0.4rem; }
+.home-hero-actions .btn { padding: 0.65rem 1.15rem; font-size: 1.02rem; text-decoration: none; }
+.home-hero-actions .btn img { margin: -4px 0; }
+.home-hero-note { font-size: 0.92rem; margin: 0; }
+
+/* ---------- Échiquier vivant ---------- */
+.home-live { margin: 0; display: grid; gap: 0.7rem; min-width: 0; }
+.home-live .board-wrap { margin: 0 auto; }
+.home-live-games { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.home-live-games button {
+  font: inherit; font-size: 0.85rem; font-weight: 500; cursor: pointer;
+  padding: 0.22rem 0.7rem; border-radius: 999px; border: 1px solid var(--border);
+  background: transparent; color: var(--muted);
+}
+.home-live-games button:hover { border-color: var(--brass); color: var(--text); }
+.home-live-games button.on { background: var(--brass); border-color: var(--brass); color: var(--brass-text); }
+
+.home-live-controls { display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap; }
+.home-live-controls .btn { padding: 0.42rem 0.7rem; min-width: 2.6rem; }
+.home-live-progress { margin-left: auto; color: var(--muted); font-size: 0.8rem; }
+.home-live-progress em { font-style: normal; color: var(--accent); }
+
+/* Fiche façon feuille de notation */
+.home-sheet {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow);
+  padding: 0.75rem 1rem 0.85rem 1.4rem; display: grid; gap: 0.45rem; min-width: 0;
+  /* marge rouge de la feuille */
+  background-image: linear-gradient(to right, transparent 0.7rem, color-mix(in srgb, var(--bad) 35%, transparent) 0.7rem, color-mix(in srgb, var(--bad) 35%, transparent) calc(0.7rem + 1px), transparent calc(0.7rem + 1px));
+}
+.home-sheet-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.15rem 0.75rem; align-items: baseline; min-width: 0; }
+.home-sheet-players { font-family: var(--display); font-size: 1.02rem; min-width: 0; overflow-wrap: anywhere; }
+.home-sheet-meta { color: var(--muted); font-size: 0.75rem; }
+.home-sheet-row {
+  display: grid; grid-template-columns: 2.2rem minmax(0, 1fr) minmax(0, 1fr); align-items: center;
+  font-family: var(--mono); font-size: 1.05rem; border-block: 1px solid var(--ruled); padding: 0.2rem 0;
+}
+.home-sheet-num { color: var(--muted); text-align: right; padding-right: 0.6rem; }
+.home-sheet-move { padding: 0.1rem 0.5rem; border-radius: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.home-sheet-row .muted { grid-column: 2 / -1; font-family: var(--font); font-size: 0.95rem; }
+.home-sheet-move.current { background: var(--brass); color: var(--brass-text); font-weight: 600; justify-self: start; }
+.home-sheet-comment {
+  margin: 0; min-height: 4.65em; line-height: 1.55;
+  background-image: repeating-linear-gradient(to bottom, transparent 0 calc(1.55em - 1px), var(--ruled) calc(1.55em - 1px) 1.55em);
+}
+.home-sheet-ref { color: var(--accent); font-size: 0.85em; }
+.home-sheet-link { font-size: 0.9rem; font-weight: 500; justify-self: start; }
+
+/* ---------- Sommaire des sections ---------- */
+.home-index { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2.2fr); gap: 1.5rem 3rem; align-items: start; }
+.home-index > * { min-width: 0; }
+.home-index-head { display: grid; gap: 0.4rem; position: sticky; top: calc(var(--topbar-h) + 1.25rem); }
+.home-index-head h2 { margin: 0; font-size: 1.9rem; }
+.home-index-head p { margin: 0; }
+.home-index-list { list-style: none; margin: 0; padding: 0; border-top: 2px solid var(--text); }
+.home-index-list li { border-bottom: 1px solid var(--border); }
+.home-index-item {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 0.25rem 1.1rem; align-items: center;
+  padding: 1rem 0.6rem; color: var(--text); text-decoration: none; border-radius: 6px;
+  transition: background 0.15s;
+}
+.home-index-item:hover { background: var(--surface-2); }
+.home-index-icon {
+  width: 56px; height: 56px; display: grid; place-items: center; border-radius: 50%;
+  background: var(--surface); border: 1px solid var(--border); transition: border-color 0.15s;
+}
+.home-index-item:hover .home-index-icon { border-color: var(--brass); }
+.home-index-body { display: grid; gap: 0.1rem; min-width: 0; }
+.home-index-title { font-family: var(--display); font-weight: 700; font-size: 1.35rem; line-height: 1.2; }
+.home-index-item:hover .home-index-title { color: var(--accent); }
+.home-index-text { color: var(--muted); }
+.home-index-detail {
+  font-size: 0.78rem; color: var(--accent); text-align: right; white-space: nowrap;
+  padding: 0.2rem 0.55rem; border: 1px solid var(--border); border-radius: 4px; background: var(--surface);
+}
+/* Les deux premières salles (Jouer, Analyse) sont mises en avant */
+.home-index-list li:nth-child(-n + 2) .home-index-title { font-size: 1.6rem; }
+
+/* ---------- Bande « Ce qui rend ce site différent » ---------- */
+.home-why {
+  background: var(--walnut); color: var(--walnut-text); border-radius: 10px;
+  padding: clamp(1.25rem, 4vw, 2.5rem); display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr);
+  gap: 1.5rem 2.5rem; align-items: center; box-shadow: var(--shadow);
+}
+.home-why > * { min-width: 0; }
+.home-why .eyebrow { color: var(--brass); }
+.home-why-intro { display: grid; gap: 0.6rem; }
+.home-why-intro h2 { margin: 0; font-size: clamp(1.5rem, 3vw, 2rem); color: var(--walnut-text); }
+.home-why-intro p { margin: 0; color: color-mix(in srgb, var(--walnut-text) 78%, transparent); }
+.home-why-demo { display: grid; grid-template-columns: minmax(0, 220px) minmax(0, 1fr); gap: 1.25rem; align-items: center; }
+.home-why-demo > * { min-width: 0; }
+.home-why-board { display: grid; gap: 0.4rem; justify-items: center; }
+.home-why-board .board-wrap { margin: 0 auto; }
+.home-why-caption { font-size: 0.72rem; color: color-mix(in srgb, var(--walnut-text) 70%, transparent); text-align: center; }
+.home-why-card {
+  background: var(--surface); color: var(--text); border-radius: var(--radius); padding: 1rem 1.15rem;
+  display: grid; gap: 0.5rem; border-left: 4px solid var(--brass);
+}
+.home-why-tags { display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; }
+.home-why-card h3 { margin: 0; font-size: 1.3rem; color: var(--accent); }
+.home-why-card p { margin: 0; }
+.home-why-points { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 0.25rem 0.8rem; margin: 0.2rem 0 0; font-size: 0.93rem; }
+.home-why-points dt { font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); padding-top: 0.2rem; }
+.home-why-points dd { margin: 0; }
+
+/* ---------- Responsive ---------- */
+@media (max-width: 1100px) {
+  .home-why { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 900px) {
+  .home { gap: 2.5rem; }
+  .home-hero { grid-template-columns: minmax(0, 1fr); }
+  .home-hero-board { width: 100%; max-width: 560px; justify-self: center; }
+  .home-index { grid-template-columns: minmax(0, 1fr); }
+  .home-index-head { position: static; }
+}
+@media (max-width: 640px) {
+  .home-hero-board { max-width: none; }
+  .home-hero-actions .btn { flex: 1 1 100%; }
+  .home-index-item { grid-template-columns: auto minmax(0, 1fr); padding: 0.85rem 0.25rem; }
+  .home-index-icon { width: 46px; height: 46px; }
+  .home-index-icon img { width: 32px; height: 32px; }
+  .home-index-detail { grid-column: 2; justify-self: start; text-align: left; white-space: normal; }
+  .home-index-list li:nth-child(-n + 2) .home-index-title { font-size: 1.4rem; }
+  .home-why-demo { grid-template-columns: minmax(0, 1fr); }
+  .home-why-board { max-width: 260px; width: 100%; justify-self: center; }
+  .home-sheet { padding-left: 1.2rem; padding-right: 0.75rem; }
+  .home-sheet-comment { min-height: 6.2em; }
+}
+@media (max-width: 420px) {
+  .home-live-controls .btn { min-width: 0; flex: 1 1 0; padding-inline: 0.4rem; }
+  .home-live-progress { flex-basis: 100%; margin-left: 0; text-align: center; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .home-index-item, .home-index-icon { transition: none; }
+}

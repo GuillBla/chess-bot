@@ -1,5 +1,5 @@
 // Schémas d'architecture : NNUE (Stockfish & co.) et réseau policy/value + MCTS (AlphaZero, Leela).
-// Toutes les couleurs passent par des classes CSS (bloc « Engines » de styles.css) pour le thème clair/sombre.
+// Toutes les couleurs passent par des classes CSS (styles/engines.css) pour le thème clair/sombre.
 
 function ArrowDefs({ id }: { id: string }) {
   return (
@@ -17,6 +17,7 @@ export function NnueDiagram() {
   const changed = { off: 11, on: 29 };
   return (
     <figure className="eng-figure">
+      <div className="eng-svg-scroll">
       <svg className="eng-svg" viewBox="0 0 760 330" role="img" aria-label="Architecture NNUE">
         <ArrowDefs id="nnue-arrow" />
         {/* Entrées */}
@@ -69,6 +70,7 @@ export function NnueDiagram() {
         <text className="dg-label" x={711} y={157} textAnchor="middle">Éval</text>
         <text className="dg-small" x={711} y={175} textAnchor="middle">(cp)</text>
       </svg>
+      </div>
       <figcaption className="muted">
         NNUE : quand une pièce bouge, seules 2 à 4 entrées changent (case barrée → case verte). L'accumulateur est mis à jour en ajoutant/soustrayant
         quelques colonnes de poids, au lieu de recalculer toute la couche : c'est ce qui rend le réseau assez rapide pour des millions de positions par seconde sur CPU.
@@ -90,6 +92,7 @@ export function MctsDiagram() {
   const pt = (deg: number, rad = r) => [cx + rad * Math.cos((deg * Math.PI) / 180), cy + rad * Math.sin((deg * Math.PI) / 180)];
   return (
     <figure className="eng-figure">
+      <div className="eng-svg-scroll">
       <svg className="eng-svg" viewBox="0 0 760 330" role="img" aria-label="Réseau policy/value et boucle MCTS">
         <ArrowDefs id="mcts-arrow" />
         {/* Réseau */}
@@ -134,6 +137,7 @@ export function MctsDiagram() {
         <line className="dg-arrow dashed" x1={382} y1={277} x2={cx - 76} y2={cy + r + 4} markerEnd="url(#mcts-arrow)" />
         <text className="dg-small" x={cx} y={318} textAnchor="middle">Coup joué = le plus visité</text>
       </svg>
+      </div>
       <figcaption className="muted">
         Q = valeur moyenne observée du coup, P = probabilité donnée par la policy, N = visites du parent, n = visites du coup. Les coups que la policy juge
         prometteurs sont explorés en premier, puis l'exploration se rééquilibre selon les résultats.

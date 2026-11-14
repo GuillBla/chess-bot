@@ -47,6 +47,10 @@ export interface BoardProps {
   id?: string;
 }
 
+function reducedMotion(): boolean {
+  return typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+}
+
 /** Échiquier commun à toutes les pages (jeu, analyse, leçons, parties). */
 export default function Board({
   fen,
@@ -134,7 +138,7 @@ export default function Board({
             customBoardStyle={{ borderRadius: 2 }}
             customNotationStyle={{ fontFamily: 'var(--font)', fontWeight: 700, fontSize: Math.max(9, Math.round(width / 50)) }}
             showBoardNotation={prefs.coordinates}
-            animationDuration={180}
+            animationDuration={reducedMotion() ? 0 : 180}
           />
           {badge && badgeStyle && (
             <span className={`board-badge cls-${badge.cls}`} style={badgeStyle} title={badge.title}>

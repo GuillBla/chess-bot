@@ -9,7 +9,11 @@ import { getAnalysisEngine, getPlayEngine, type EngineLine } from '../engine/sto
 import { MAX_ELO, MIN_ELO, eloLabel, pickBotMove, strengthForElo } from '../engine/strength';
 import { START_FEN, formatScore, parseUci, whiteScore } from '../lib/chessUtils';
 import { explainMove, explainPosition } from '../analysis/explain';
+import { MATE_CP, classifyMove, lineCp, type MoveClass } from '../analysis/classify';
 import type { BoardArrow, MoveExplanation, SquareMark } from '../analysis/types';
+import { PieceIcon } from '../components/pieces';
+import PlayerCard from '../components/play/PlayerCard';
+import { badgeFor } from '../components/play/moveClass';
 
 type Side = 'w' | 'b';
 type ColorChoice = Side | 'random';
@@ -76,6 +80,27 @@ function pgnResult(chess: Chess, resigned: string | null | undefined): string {
   return '*';
 }
 
+/**
+ * Classe un coup à partir de l'analyse MultiPV de la position d'avant
+ * (et, si le coup n'y figure pas, de la meilleure ligne de la position d'après).
+ */
+function classifyPlayed(fenAfter: string, uci: string, lines: EngineLine[], bestMove: string | null, afterLine?: EngineLine): MoveClass | undefined {
+  const best = lines[0];
+  if (!best) return undefined;
+  const beforeCp = lineCp(best);
+  const own = lines.find((l) => l.pv[0] === uci);
+  const after = new Chess(fenAfter);
+  let afterCp: number;
+  if (after.isCheckmate()) afterCp = MATE_CP;
+  else if (after.isDraw()) afterCp = 0;
+  else if (own) afterCp = lineCp(own);
+  else if (afterLine) afterCp = -lineCp(afterLine);
+  else return undefined;
+  return classifyMove({ beforeCp, afterCp, isBest: (bestMove ?? best.pv[0]) === uci }).cls;
+}
+
+const ELO_TICKS = [400, 1200, 2000, 3000];
+
 export default function Play() {
   const navigate = useNavigate();
   const saved = useMemo(() => load<SavedGame>(STORAGE_KEY), []);
@@ -93,7 +118,7 @@ export default function Play() {
   const [thinking, setThinking] = useState(false);
 
   // Aide
-  const [explanation, setExplanation] = useState<{ title: string; ex: MoveExplanation } | null>(null);
+  const [explanation, setExplanation] = useState<{ kind: 'hint' | 'last'; title: string; ex: MoveExplanation; fenBefore: string; cls?: MoveClass } | null>(null);
   const [helpLoading, setHelpLoading] = useState<string | null>(null);
   const [focusArrows, setFocusArrows] = useState<{ arrows: BoardArrow[]; marks: SquareMark[] }>({ arrows: [], marks: [] });
   const [evalLine, setEvalLine] = useState<{ line: EngineLine; turn: Side } | null>(null);
@@ -219,7 +244,7 @@ export default function Play() {
     setHelpLoading('Le moteur réfléchit à la meilleure idée…');
     try {
       const { best } = await explainPosition(fen, getAnalysisEngine(), { depth: 14, multipv: 3 });
-      if (best) setExplanation({ title: 'Indice : le meilleur coup et pourquoi', ex: best });
+      if (best) setExplanation({ kind: 'hint', title: 'Indice : le meilleur coup et pourquoi', ex: best, fenBefore: fen });
       else setNotice('Aucun coup disponible.');
     } catch (e) {
       console.error(e);
@@ -249,7 +274,7 @@ export default function Play() {
         afterLine = (await engine.analyse(after, { depth: 13, multipv: 1 })).lines[0];
       }
       const ex = explainMove(before, uci, analysis, { afterLine });
-      setExplanation({ title: `Votre coup ${sans[lastPlayerPly]}`, ex });
+      setExplanation({ kind: 'last', title: 'Votre dernier coup', ex, fenBefore: before, cls: classifyPlayed(after, uci, analysis.lines, analysis.bestMove, afterLine) });
     } catch (e) {
       console.error(e);
       setNotice('L’analyse a échoué.');
@@ -294,98 +319,199 @@ export default function Play() {
 
   // ---- Affichage ------------------------------------------------------------
   const last = moves.length ? parseUci(moves[moves.length - 1]) : null;
-  const defaultArrows: BoardArrow[] = explanation ? [{ from: explanation.ex.uci.slice(0, 2) as Square, to: explanation.ex.uci.slice(2, 4) as Square, kind: explanation.title.startsWith('Indice') ? 'good' : 'idea' }] : [];
+  const defaultArrows: BoardArrow[] = explanation ? [{ from: explanation.ex.uci.slice(0, 2) as Square, to: explanation.ex.uci.slice(2, 4) as Square, kind: explanation.kind === 'hint' ? 'good' : 'idea' }] : [];
   const arrows = focusArrows.arrows.length ? focusArrows.arrows : defaultArrows;
   const marks = focusArrows.marks;
+  const badge = explanation?.kind === 'last' ? badgeFor(explanation.ex.uci, explanation.cls) : null;
   const resultText = game?.result ? (game.result === (game.player === 'w' ? '0-1' : '1-0') ? 'Vous avez abandonné.' : 'Le bot a abandonné.') : over;
-  const statusText = !game
-    ? 'Choisissez vos réglages puis lancez une partie.'
-    : resultText ?? (thinking || !playerTurn ? 'Le bot réfléchit…' : chess.inCheck() ? 'Échec ! À vous de jouer.' : 'À vous de jouer.');
+  const boardOrientation: 'white' | 'black' = game ? orientation : colorChoice === 'b' ? 'black' : 'white';
+  const busy = !!helpLoading;
+
+  // Cartes joueurs : le camp en haut de l'échiquier dépend de l'orientation (comme sur chess.com).
+  const topSide: Side = boardOrientation === 'white' ? 'b' : 'w';
+  const playerCard = (side: Side) => {
+    if (!game) return null;
+    const isYou = side === game.player;
+    const toMove = !finished && turn === side;
+    if (!isYou) {
+      return (
+        <PlayerCard
+          side={side}
+          name="Stockfish"
+          detail={`${game.elo} Elo · ${eloLabel(game.elo)}`}
+          fen={fen}
+          active={toMove}
+          status={
+            thinking || toMove ? (
+              <span className="player-thinking">
+                <span className="spinner" aria-hidden /> réfléchit…
+              </span>
+            ) : null
+          }
+        />
+      );
+    }
+    const check = toMove && chess.inCheck();
+    return (
+      <PlayerCard
+        side={side}
+        name="Vous"
+        detail={side === 'w' ? 'Blancs' : 'Noirs'}
+        fen={fen}
+        active={toMove}
+        you
+        status={toMove ? <span className={`player-turn${check ? ' check' : ''}`}>{check ? 'Échec ! À vous' : 'À vous de jouer'}</span> : null}
+      />
+    );
+  };
+
+  const settings = (
+    <>
+      <div className="play-field">
+        <span className="play-label" id="color-label">
+          Votre couleur
+        </span>
+        <div className="color-choice" role="radiogroup" aria-labelledby="color-label">
+          {(
+            [
+              ['w', 'Blancs'],
+              ['b', 'Noirs'],
+              ['random', 'Aléatoire'],
+            ] as const
+          ).map(([v, l]) => (
+            <button key={v} type="button" role="radio" aria-checked={colorChoice === v} className={`color-opt${colorChoice === v ? ' on' : ''}`} onClick={() => setColorChoice(v)}>
+              <span className={`color-icon${v === 'random' ? ' split' : ''}`} aria-hidden>
+                {v === 'random' ? (
+                  <>
+                    <PieceIcon piece="wK" size={26} />
+                    <PieceIcon piece="bK" size={26} />
+                  </>
+                ) : (
+                  <PieceIcon piece={v === 'w' ? 'wK' : 'bK'} size={34} />
+                )}
+              </span>
+              {l}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="play-field">
+        <label htmlFor="elo" className="play-label">
+          Force du bot
+        </label>
+        <div className="elo-readout">
+          <strong>{eloSetting}</strong> <span className="elo-unit">Elo</span>
+          <span className="elo-level">{eloLabel(eloSetting)}</span>
+        </div>
+        <input
+          id="elo"
+          type="range"
+          min={MIN_ELO}
+          max={MAX_ELO}
+          step={50}
+          value={eloSetting}
+          onChange={(e) => setEloSetting(Number(e.target.value))}
+          aria-valuetext={`${eloSetting} Elo, ${eloLabel(eloSetting)}`}
+        />
+        <div className="elo-ticks">
+          {ELO_TICKS.map((t) => {
+            const pct = ((t - MIN_ELO) / (MAX_ELO - MIN_ELO)) * 100;
+            return (
+              <button
+                key={t}
+                type="button"
+                className={`elo-tick${eloSetting === t ? ' on' : ''}`}
+                style={{ left: `calc(${pct.toFixed(2)}% + ${((0.5 - pct / 100) * 16).toFixed(1)}px)` }}
+                onClick={() => setEloSetting(t)}
+                title={eloLabel(t)}
+              >
+                {t}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      <label className="play-toggle">
+        <input type="checkbox" checked={showEval} onChange={(e) => setShowEval(e.target.checked)} />
+        <span>
+          Afficher la barre d’évaluation <span className="muted">(désactivée par défaut pour ne pas tricher)</span>
+        </span>
+      </label>
+      <button className="btn primary play-start" onClick={newGame}>
+        {game ? 'Lancer une nouvelle partie' : 'Commencer la partie'}
+      </button>
+    </>
+  );
 
   return (
-    <div className="page play-page">
-      <h1>Jouer contre le bot</h1>
-      <div className="board-layout">
-        {showEval && game ? (
-          <EvalBar
-            whiteCp={evalLine ? whiteScore(evalLine.line, evalLine.turn) : 0}
-            label={evalLine ? formatScore(evalLine.line, evalLine.turn) : '…'}
-            orientation={orientation}
-            height={480}
-          />
-        ) : (
-          <div />
-        )}
+    <div className={`page play-page${game ? '' : ' no-game'}`}>
+      <header className="page-head">
+        <span className="eyebrow">Partie d’entraînement</span>
+        <h1>Jouer contre Stockfish</h1>
+      </header>
+      <div className="board-layout two-col">
         <div className="board-col">
-          <div className="play-status">
-            {game && (
-              <span className="badge idea" title={eloLabel(game.elo)}>
-                Bot : {game.elo} Elo · {eloLabel(game.elo)}
-              </span>
+          {playerCard(topSide)}
+          <div className="board-row">
+            {showEval && game && (
+              <EvalBar whiteCp={evalLine ? whiteScore(evalLine.line, evalLine.turn) : 0} label={evalLine ? formatScore(evalLine.line, evalLine.turn) : '…'} orientation={boardOrientation} />
             )}
-            <span className={`play-status-text${finished ? ' done' : ''}`}>
-              {thinking && <span className="spinner" aria-hidden />} {statusText}
-            </span>
+            <div className="board-row-main">
+              <Board fen={fen} orientation={boardOrientation} onMove={game && playerTurn ? onMove : undefined} arrows={arrows} marks={marks} lastMove={last} badge={badge} id="play-board" />
+            </div>
           </div>
-          <Board fen={fen} orientation={orientation} onMove={game && playerTurn ? onMove : undefined} arrows={arrows} marks={marks} lastMove={last} id="play-board" />
-          <div className="btn-row" style={{ marginTop: '0.6rem' }}>
-            <button className="btn primary" onClick={hint} disabled={!playerTurn || !!helpLoading}>
-              Indice
-            </button>
-            <button className="btn" onClick={explainLast} disabled={lastPlayerPly < 0 || !!helpLoading}>
-              Expliquer mon dernier coup
-            </button>
-            <button className="btn" onClick={undo} disabled={!game || lastPlayerPly < 0 || !!helpLoading}>
-              Annuler
-            </button>
-            <button className="btn" onClick={() => setOrientation((o) => (o === 'white' ? 'black' : 'white'))}>
-              Retourner
-            </button>
-            <button className="btn" onClick={resign} disabled={!game || finished}>
-              Abandonner
-            </button>
-          </div>
+          {playerCard(topSide === 'w' ? 'b' : 'w')}
+          {game && resultText && (
+            <div className="play-result" role="status">
+              <span className="eyebrow">Partie terminée</span>
+              <strong>{resultText}</strong>
+              <span className="mono">{pgnResult(chess, game.result)}</span>
+            </div>
+          )}
+          {game && (
+            <div className="toolbar" role="toolbar" aria-label="Actions de la partie">
+              <div className="toolbar-group">
+                <button className="btn primary" onClick={hint} disabled={!playerTurn || busy} title="Le meilleur coup, expliqué">
+                  Indice
+                </button>
+                <button className="btn" onClick={explainLast} disabled={lastPlayerPly < 0 || busy}>
+                  Expliquer mon dernier coup
+                </button>
+              </div>
+              <div className="toolbar-group">
+                <button className="btn" onClick={undo} disabled={lastPlayerPly < 0 || busy} title="Reprendre votre dernier coup">
+                  <span aria-hidden>↶</span> Annuler
+                </button>
+                <button className="btn" onClick={() => setOrientation((o) => (o === 'white' ? 'black' : 'white'))} title="Retourner l’échiquier">
+                  <span aria-hidden>⇅</span> Retourner
+                </button>
+                <button className="btn" onClick={resign} disabled={finished}>
+                  <span aria-hidden>⚑</span> Abandonner
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="side-col play-side">
-          <div className="card">
-            <h3>Nouvelle partie</h3>
-            <div className="play-field">
-              <label>Votre couleur</label>
-              <div className="btn-row">
-                {(
-                  [
-                    ['w', 'Blancs'],
-                    ['b', 'Noirs'],
-                    ['random', 'Aléatoire'],
-                  ] as const
-                ).map(([v, l]) => (
-                  <button key={v} type="button" className={`btn${colorChoice === v ? ' primary' : ''}`} onClick={() => setColorChoice(v)}>
-                    {l}
-                  </button>
-                ))}
-              </div>
+          {game ? (
+            <details className="card play-settings">
+              <summary>
+                <span className="play-settings-title">Nouvelle partie</span>
+                <span className="muted">Couleur, force du bot…</span>
+              </summary>
+              <div className="play-settings-body">{settings}</div>
+            </details>
+          ) : (
+            <div className="card play-settings">
+              <h3>Nouvelle partie</h3>
+              <p className="muted play-intro">Choisissez votre couleur et la force de Stockfish, puis lancez la partie. L’indice et l’explication de vos coups sont là pour apprendre.</p>
+              <div className="play-settings-body">{settings}</div>
             </div>
-            <div className="play-field">
-              <label htmlFor="elo">
-                Force du bot : <strong>{eloSetting} Elo</strong> <span className="muted">({eloLabel(eloSetting)})</span>
-              </label>
-              <input id="elo" type="range" min={MIN_ELO} max={MAX_ELO} step={50} value={eloSetting} onChange={(e) => setEloSetting(Number(e.target.value))} />
-              <div className="play-range-legend muted">
-                <span>{MIN_ELO}</span>
-                <span>{MAX_ELO}</span>
-              </div>
-            </div>
-            <button className="btn primary" onClick={newGame}>
-              {game ? 'Nouvelle partie' : 'Commencer la partie'}
-            </button>
-            <label className="play-toggle">
-              <input type="checkbox" checked={showEval} onChange={(e) => setShowEval(e.target.checked)} /> Afficher la barre d’évaluation <span className="muted">(désactivée par défaut pour ne pas tricher)</span>
-            </label>
-          </div>
+          )}
 
           {(helpLoading || notice || explanation) && (
-            <div className="card">
+            <div className="card play-help" aria-live="polite">
               {helpLoading && (
                 <p className="muted">
                   <span className="spinner" aria-hidden /> {helpLoading}
@@ -393,23 +519,36 @@ export default function Play() {
               )}
               {notice && !helpLoading && <p className="muted">{notice}</p>}
               {explanation && !helpLoading && (
-                <ExplanationPanel title={explanation.title} explanation={explanation.ex} onFocusArrows={(a, m) => setFocusArrows({ arrows: a, marks: m })} />
+                <ExplanationPanel
+                  title={explanation.title}
+                  explanation={explanation.ex}
+                  cls={explanation.cls}
+                  fenBefore={explanation.fenBefore}
+                  onFocusArrows={(a, m) => setFocusArrows({ arrows: a, marks: m })}
+                />
               )}
             </div>
           )}
 
-          <div className="card">
-            <h3>Coups</h3>
-            <MoveList sans={sans} current={sans.length} onSelect={() => undefined} />
-            <div className="btn-row" style={{ marginTop: '0.6rem' }}>
-              <button className="btn" onClick={copyPgn} disabled={!moves.length}>
-                Copier le PGN
-              </button>
-              <button className="btn" onClick={() => navigate('/analyze', { state: { pgn: pgn() } })} disabled={!moves.length}>
-                Analyser cette partie
-              </button>
+          {game && (
+            <div className="card">
+              <div className="card-head">
+                <h3>Feuille de partie</h3>
+                <span className="muted">
+                  {Math.ceil(sans.length / 2)} coup{sans.length > 2 ? 's' : ''}
+                </span>
+              </div>
+              <MoveList sans={sans} current={sans.length} onSelect={() => undefined} />
+              <div className="btn-row" style={{ marginTop: '0.6rem' }}>
+                <button className="btn" onClick={copyPgn} disabled={!moves.length}>
+                  Copier le PGN
+                </button>
+                <button className="btn" onClick={() => navigate('/analyze', { state: { pgn: pgn() } })} disabled={!moves.length}>
+                  Analyser cette partie
+                </button>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </div>

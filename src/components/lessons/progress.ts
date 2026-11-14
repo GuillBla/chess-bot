@@ -65,3 +65,27 @@ export function useProgress(): Progress {
   }, [refresh]);
   return p;
 }
+
+// Dernière leçon ouverte (pour « Continuer là où tu t'es arrêté »).
+const LAST_KEY = 'chessbot.lessons.last.v1';
+
+export function setLastLesson(lessonId: string) {
+  try {
+    localStorage.setItem(LAST_KEY, lessonId);
+  } catch {
+    /* ignore */
+  }
+}
+
+export function getLastLesson(): string | null {
+  try {
+    return localStorage.getItem(LAST_KEY);
+  } catch {
+    return null;
+  }
+}
+
+/** Nombre d'exercices résolus d'une leçon (indices hors limites ignorés). */
+export function solvedCount(progress: Progress, lessonId: string, total: number): number {
+  return (progress[lessonId] ?? []).filter((k) => k >= 0 && k < total).length;
+}

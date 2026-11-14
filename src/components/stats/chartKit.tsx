@@ -1,7 +1,7 @@
-// Briques communes des graphiques (recharts) : couleurs par rôle (variables CSS du bloc
-// « Stats/MyGames » de styles.css, déclinées en clair/sombre), infobulle, axes discrets.
+// Briques communes des graphiques (recharts) : couleurs par rôle (variables --viz-* de
+// src/styles/stats.css, déclinées en clair/sombre), infobulle, axes discrets, sélecteur segmenté.
 import type { ReactNode } from 'react';
-import type { TimeClass } from '../../api/chesscom';
+import type { Outcome, TimeClass } from '../../api/chesscom';
 
 /** Couleurs catégorielles par cadence : la couleur suit l'entité, jamais son rang. */
 export const TIME_CLASS_COLORS: Record<TimeClass, string> = {
@@ -12,6 +12,8 @@ export const TIME_CLASS_COLORS: Record<TimeClass, string> = {
 };
 
 export const WDL_COLORS = { win: 'var(--viz-win)', draw: 'var(--viz-draw)', loss: 'var(--viz-loss)' };
+/** Encre lisible posée sur chaque couleur V/N/D (étiquettes directes). */
+export const WDL_INK = { win: 'var(--viz-on-win)', draw: 'var(--viz-on-draw)', loss: 'var(--viz-on-loss)' };
 
 export const AXIS_PROPS = {
   stroke: 'var(--viz-axis-line)',
@@ -21,9 +23,21 @@ export const AXIS_PROPS = {
 
 export const GRID_PROPS = { stroke: 'var(--viz-grid)', strokeDasharray: '0', vertical: false } as const;
 
-export function ChartCard({ title, subtitle, children, actions }: { title: string; subtitle?: ReactNode; children: ReactNode; actions?: ReactNode }) {
+export function ChartCard({
+  title,
+  subtitle,
+  children,
+  actions,
+  className = '',
+}: {
+  title: ReactNode;
+  subtitle?: ReactNode;
+  children: ReactNode;
+  actions?: ReactNode;
+  className?: string;
+}) {
   return (
-    <section className="card viz-card">
+    <section className={`card viz-card ${className}`}>
       <div className="viz-card-head">
         <div>
           <h3>{title}</h3>
@@ -64,4 +78,40 @@ export function Legend({ items }: { items: { color: string; label: string }[] })
   );
 }
 
+/** Sélecteur segmenté (période, cadence…). */
+export function Seg<T extends string>({
+  value,
+  options,
+  onChange,
+  label,
+}: {
+  value: T;
+  options: { id: T; label: ReactNode }[];
+  onChange: (v: T) => void;
+  label: string;
+}) {
+  return (
+    <div className="viz-seg" role="group" aria-label={label}>
+      {options.map((o) => (
+        <button key={o.id} type="button" className={value === o.id ? 'active' : ''} aria-pressed={value === o.id} onClick={() => onChange(o.id)}>
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+const RESULT_LETTER: Record<Outcome, string> = { win: 'V', draw: 'N', loss: 'D' };
+const RESULT_LABEL: Record<Outcome, string> = { win: 'Victoire', draw: 'Nulle', loss: 'Défaite' };
+
+/** Pastille de résultat V / N / D (lettre + couleur : jamais la couleur seule). */
+export function ResultPill({ outcome, title, small }: { outcome: Outcome; title?: string; small?: boolean }) {
+  return (
+    <span className={`res-pill ${outcome}${small ? ' sm' : ''}`} title={title ?? RESULT_LABEL[outcome]} aria-label={title ?? RESULT_LABEL[outcome]} role="img">
+      {RESULT_LETTER[outcome]}
+    </span>
+  );
+}
+
 export const fmtPct = (x: number) => `${Math.round(x)} %`;
+export const fmtSigned = (x: number) => (x > 0 ? `+${x}` : x < 0 ? `−${Math.abs(x)}` : '±0');

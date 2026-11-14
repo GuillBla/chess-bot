@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Chess, type Square } from 'chess.js';
 import Board from '../Board';
 import { formatLine, parseUci } from '../../lib/chessUtils';
@@ -6,14 +6,19 @@ import { getAnalysisEngine, type EngineLine } from '../../engine/stockfish';
 import type { Exercise } from '../../content/lessons/types';
 import type { BoardArrow, SquareMark } from '../../analysis/types';
 import { RichText } from './RichText';
+import { TurnIndicator, splitSource } from './book';
 
 type Status = 'playing' | 'wrong' | 'checking' | 'solved' | 'alternative' | 'revealed';
 
 interface Props {
   exercise: Exercise;
   index: number;
+  /** Nombre d'exercices du chapitre (affiché « Exercice 2 / 4 »). */
+  total?: number;
   solvedBefore: boolean;
   onSolved: () => void;
+  /** Contenu ajouté en bas du panneau (ex. « Exercice suivant »). */
+  footer?: ReactNode;
 }
 
 /** Tolérance (centipions) pour accepter un coup non prévu, vérifié par Stockfish. */
@@ -31,7 +36,7 @@ function sideName(fen: string) {
   return fen.split(' ')[1] === 'b' ? 'Les Noirs' : 'Les Blancs';
 }
 
-export default function ExercisePlayer({ exercise, index, solvedBefore, onSolved }: Props) {
+export default function ExercisePlayer({ exercise, index, total, solvedBefore, onSolved, footer }: Props) {
   const { fen: startFen, solution } = exercise;
   const orientation = startFen.split(' ')[1] === 'b' ? 'black' : 'white';
   const [fen, setFen] = useState(startFen);
@@ -200,62 +205,85 @@ export default function ExercisePlayer({ exercise, index, solvedBefore, onSolved
   const marks: SquareMark[] = hint && expected && !done ? [{ square: expected.slice(0, 2) as Square, kind: 'strong' }] : [];
   const arrows: BoardArrow[] = wrongArrow ? [wrongArrow] : [];
   const msgClass =
-    status === 'wrong' ? 'bad' : status === 'solved' || status === 'alternative' ? 'good' : status === 'revealed' ? 'idea' : '';
+    status === 'wrong' ? 'is-bad' : status === 'solved' || status === 'alternative' ? 'is-good' : status === 'revealed' ? 'is-idea' : '';
+  const cardState = status === 'solved' || status === 'alternative' ? 'is-solved' : status === 'wrong' ? 'is-wrong' : status === 'revealed' ? 'is-revealed' : '';
+  const { title, source } = splitSource(exercise.title);
 
   return (
-    <div className="lesson-ex-grid">
-      <div className="lesson-board">
-        <Board
-          id={`exercise-${index}`}
-          fen={fen}
-          orientation={orientation}
-          onMove={done || status === 'checking' ? undefined : onMove}
-          arrows={arrows}
-          marks={marks}
-          lastMove={lastMove}
-          maxWidth={480}
-        />
-      </div>
-      <div className="lesson-ex-side">
-        {exercise.title && <h3>{exercise.title}</h3>}
-        <p className="lesson-turn">
-          <span className={`badge ${orientation === 'white' ? '' : 'idea'}`}>{sideName(startFen)} jouent</span>
-          {solvedBefore && <span className="badge good">Déjà réussi</span>}
-        </p>
-        <p>
-          <RichText text={exercise.prompt} />
-        </p>
-        {message && (
-          <p className={`lesson-msg ${msgClass}`} role="status">
-            {status === 'checking' && <span className="spinner" aria-hidden />} {message}
-          </p>
-        )}
-        {status === 'revealed' && <p className="mono lesson-line">{formatLine(startFen, solution, solution.length)}</p>}
-        <div className="btn-row">
-          {!done && (
-            <>
-              <button className="btn" onClick={() => setHint(true)} disabled={hint || status === 'checking'}>
-                Indice
-              </button>
-              <button className="btn" onClick={showSolution} disabled={status === 'checking'}>
-                Solution
-              </button>
-            </>
-          )}
-          <button className="btn ghost" onClick={reset}>
-            Recommencer
-          </button>
+    <div className={`card ex-card ${cardState}`}>
+      <header className="ex-head">
+        <span className="eyebrow">
+          Exercice {index + 1}
+          {total ? ` / ${total}` : ''} · À toi de jouer
+        </span>
+        <div className="ex-head-row">
+          <TurnIndicator fen={startFen} label={`${sideName(startFen)} jouent`} />
+          {solvedBefore && !done && <span className="badge good">Déjà réussi</span>}
         </div>
-        {hint && !done && <p className="muted small">La case en vert indique la pièce à jouer.</p>}
-        {done && (
-          <div className="lesson-explain">
-            <h4>Explication</h4>
-            {status !== 'revealed' && <p className="mono lesson-line">{formatLine(startFen, solution, solution.length)}</p>}
-            <p>
-              <RichText text={exercise.explanation} />
+      </header>
+      <div className="ex-grid">
+        <div className="ex-board">
+          <Board
+            id={`exercise-${index}`}
+            fen={fen}
+            orientation={orientation}
+            onMove={done || status === 'checking' ? undefined : onMove}
+            arrows={arrows}
+            marks={marks}
+            lastMove={lastMove}
+            maxWidth={480}
+          />
+        </div>
+        <div className="ex-side">
+          {(title || source) && (
+            <h4 className="ex-title">
+              {title && <span>{title}</span>}
+              {source && <span className="diagram-source">{source}</span>}
+            </h4>
+          )}
+          <p className="ex-prompt">
+            <RichText text={exercise.prompt} />
+          </p>
+          {message && (
+            <p className={`ex-msg ${msgClass}`} role="status">
+              {status === 'checking' && <span className="spinner" aria-hidden />}
+              <span>{message}</span>
             </p>
+          )}
+          {hint && !done && (
+            <p className="ex-msg is-hint" role="status">
+              <span>
+                <strong>Indice :</strong> la case entourée sur l’échiquier porte la pièce à jouer.
+              </span>
+            </p>
+          )}
+          {status === 'revealed' && <p className="ex-line mono">{formatLine(startFen, solution, solution.length)}</p>}
+          <div className="btn-row ex-actions">
+            {!done && (
+              <>
+                <button className="btn" onClick={() => setHint(true)} disabled={hint || status === 'checking'}>
+                  Indice
+                </button>
+                <button className="btn" onClick={showSolution} disabled={status === 'checking'}>
+                  Voir la solution
+                </button>
+              </>
+            )}
+            <button className="btn ghost" onClick={reset}>
+              Recommencer
+            </button>
           </div>
-        )}
+          {done && (
+            <div className="ex-explain">
+              <h5>Explication</h5>
+              {status !== 'revealed' && <p className="ex-line mono">{formatLine(startFen, solution, solution.length)}</p>}
+              <p>
+                <RichText text={exercise.explanation} />
+              </p>
+            </div>
+          )}
+          {footer}
+        </div>
       </div>
     </div>
   );

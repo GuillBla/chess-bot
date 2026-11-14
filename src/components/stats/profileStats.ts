@@ -136,30 +136,124 @@ export function ratingSeries(games: GameSummary[], since: number) {
 
 const pct = (x: number) => `${Math.round(x)} %`;
 
+/** Variation d'Elo sur la période (premier → dernier point classé). */
+export function ratingDelta(points: { t: number; rating: number }[]): number | null {
+  if (points.length < 2) return null;
+  return points[points.length - 1].rating - points[0].rating;
+}
+
+/** Série en cours (parties les plus récentes de même issue), plus longue série de victoires, 10 derniers résultats. */
+export function streaks(games: GameSummary[]) {
+  const sorted = [...games].sort((a, b) => b.endTime - a.endTime);
+  let current: { outcome: GameSummary['outcome']; count: number } | null = null;
+  for (const g of sorted) {
+    if (!current) current = { outcome: g.outcome, count: 1 };
+    else if (g.outcome === current.outcome) current.count++;
+    else break;
+  }
+  let bestWin = 0;
+  let run = 0;
+  for (let i = sorted.length - 1; i >= 0; i--) {
+    run = sorted[i].outcome === 'win' ? run + 1 : 0;
+    bestWin = Math.max(bestWin, run);
+  }
+  return { current, bestWin, recent: sorted.slice(0, 10).map((g) => g.outcome) };
+}
+
+/** Ouverture la plus jouée (toutes couleurs), avec son score. */
+export function favoriteOpening(games: GameSummary[]): (OpeningRow & { color: 'white' | 'black' }) | null {
+  const all = [
+    ...topOpenings(games, 'white', 1).map((o) => ({ ...o, color: 'white' as const })),
+    ...topOpenings(games, 'black', 1).map((o) => ({ ...o, color: 'black' as const })),
+  ].sort((a, b) => b.total - a.total);
+  return all[0] ?? null;
+}
+
+export interface WeakPoint {
+  title: string;
+  figure: string;
+  detail: string;
+}
+
+/** Point faible le plus saillant, choisi par règles (ouverture, couleur, pendule, mat). */
+export function weakPoint(games: GameSummary[]): WeakPoint | null {
+  if (games.length < 10) return null;
+  const cands: (WeakPoint & { severity: number })[] = [];
+  for (const color of ['white', 'black'] as const) {
+    const worst = topOpenings(games, color, 20)
+      .filter((o) => o.total >= 5)
+      .sort((a, b) => a.score - b.score)[0];
+    if (worst && worst.score < 45)
+      cands.push({
+        title: worst.name,
+        figure: pct(worst.score),
+        detail: `de score avec les ${color === 'white' ? 'Blancs' : 'Noirs'} sur ${worst.total} parties : ouverture à revoir.`,
+        severity: 50 - worst.score,
+      });
+  }
+  const [w, b] = byColor(games);
+  if (w.total >= 5 && b.total >= 5 && Math.abs(w.score - b.score) >= 6) {
+    const weak = w.score < b.score ? w : b;
+    const strong = weak === w ? b : w;
+    cands.push({
+      title: `Avec les ${weak.label}`,
+      figure: pct(weak.score),
+      detail: `de score avec les ${weak.label}, contre ${pct(strong.score)} avec les ${strong.label}.`,
+      severity: Math.abs(w.score - b.score),
+    });
+  }
+  const losses = games.filter((g) => g.outcome === 'loss');
+  if (losses.length >= 5) {
+    const time = losses.filter((g) => g.reason === 'timeout').length / losses.length;
+    if (time >= 0.15) cands.push({ title: 'La pendule', figure: pct(time * 100), detail: 'de tes défaites sont au temps.', severity: time * 40 });
+    const mate = losses.filter((g) => g.reason === 'checkmate').length / losses.length;
+    if (mate >= 0.35)
+      cands.push({ title: 'La sécurité du roi', figure: pct(mate * 100), detail: 'de tes défaites se terminent par un mat.', severity: mate * 25 });
+  }
+  cands.sort((a, b2) => b2.severity - a.severity);
+  const top = cands[0];
+  return top ? { title: top.title, figure: top.figure, detail: top.detail } : null;
+}
+
+export interface Insight {
+  /** Chiffre clé mis en avant. */
+  figure: string;
+  /** Phrase qui suit le chiffre. */
+  text: string;
+  tone: 'good' | 'bad' | 'neutral';
+}
+
 /** Insights textuels calculés (aucune génération libre : uniquement des règles). */
-export function insights(games: GameSummary[]): string[] {
-  const out: string[] = [];
+export function insights(games: GameSummary[]): Insight[] {
+  const out: Insight[] = [];
   if (games.length < 10) return out;
   const [w, b] = byColor(games);
   if (w.total >= 5 && b.total >= 5) {
     const diff = w.score - b.score;
     if (Math.abs(diff) >= 5)
-      out.push(
-        `Tu marques ${pct(w.score)} avec les Blancs mais ${pct(b.score)} avec les Noirs : ${diff > 0 ? 'ton répertoire avec les Noirs' : 'ton répertoire avec les Blancs'} mérite du travail.`,
-      );
-    else out.push(`Tes résultats sont équilibrés : ${pct(w.score)} avec les Blancs, ${pct(b.score)} avec les Noirs.`);
+      out.push({
+        figure: `${Math.round(Math.abs(diff))} pts`,
+        text: `d'écart de score entre les couleurs (${pct(w.score)} avec les Blancs, ${pct(b.score)} avec les Noirs) : ton répertoire avec les ${diff > 0 ? 'Noirs' : 'Blancs'} mérite du travail.`,
+        tone: 'bad',
+      });
+    else
+      out.push({
+        figure: pct((w.score + b.score) / 2),
+        text: `de score, équilibré selon la couleur : ${pct(w.score)} avec les Blancs, ${pct(b.score)} avec les Noirs.`,
+        tone: 'neutral',
+      });
   }
   const losses = games.filter((g) => g.outcome === 'loss');
   if (losses.length >= 5) {
     const time = losses.filter((g) => g.reason === 'timeout').length / losses.length;
-    if (time >= 0.1) out.push(`${pct(time * 100)} de tes défaites sont au temps : la gestion de la pendule te coûte des points.`);
+    if (time >= 0.1) out.push({ figure: pct(time * 100), text: 'de tes défaites sont au temps : la gestion de la pendule te coûte des points.', tone: 'bad' });
     const mate = losses.filter((g) => g.reason === 'checkmate').length / losses.length;
-    if (mate >= 0.3) out.push(`${pct(mate * 100)} de tes défaites se terminent par un mat : la sécurité du roi est un axe de progrès.`);
+    if (mate >= 0.3) out.push({ figure: pct(mate * 100), text: 'de tes défaites se terminent par un mat : la sécurité du roi est un axe de progrès.', tone: 'bad' });
   }
   const wins = games.filter((g) => g.outcome === 'win');
   if (wins.length >= 5) {
     const t = wins.filter((g) => g.reason === 'timeout').length / wins.length;
-    if (t >= 0.15) out.push(`${pct(t * 100)} de tes victoires sont au temps : tu sais mettre la pression à la pendule.`);
+    if (t >= 0.15) out.push({ figure: pct(t * 100), text: 'de tes victoires sont au temps : tu sais mettre la pression à la pendule.', tone: 'good' });
   }
   for (const color of ['white', 'black'] as const) {
     const ops = topOpenings(games, color, 20).filter((o) => o.total >= 5);
@@ -167,22 +261,26 @@ export function insights(games: GameSummary[]): string[] {
       const best = [...ops].sort((a, b2) => b2.score - a.score)[0];
       const worst = [...ops].sort((a, b2) => a.score - b2.score)[0];
       const side = color === 'white' ? 'avec les Blancs' : 'avec les Noirs';
-      out.push(`Ta meilleure ouverture ${side} : ${best.name} (${pct(best.score)} sur ${best.total} parties).`);
+      out.push({ figure: pct(best.score), text: `de score ${side} dans ta meilleure ouverture : ${best.name} (${best.total} parties).`, tone: 'good' });
       if (worst.name !== best.name && worst.score < 45)
-        out.push(`Ouverture à revoir ${side} : ${worst.name} (${pct(worst.score)} sur ${worst.total} parties).`);
+        out.push({ figure: pct(worst.score), text: `seulement ${side} dans : ${worst.name} (${worst.total} parties). Ouverture à revoir.`, tone: 'bad' });
     }
   }
   const gap = byEloGap(games);
   const stronger = gap.filter((g, i) => i >= 5 && g.total > 0);
   const strongerAll = stronger.reduce((a, g) => ({ s: a.s + g.win + g.draw / 2, n: a.n + g.total }), { s: 0, n: 0 });
-  if (strongerAll.n >= 5)
-    out.push(
-      `Contre des adversaires classés 50 points ou plus au-dessus de toi, tu marques ${pct((strongerAll.s / strongerAll.n) * 100)} (${strongerAll.n} parties).`,
-    );
+  if (strongerAll.n >= 5) {
+    const sc = (strongerAll.s / strongerAll.n) * 100;
+    out.push({
+      figure: pct(sc),
+      text: `de score contre des adversaires classés 50 points ou plus au-dessus de toi (${strongerAll.n} parties).`,
+      tone: sc >= 40 ? 'good' : 'neutral',
+    });
+  }
   const tc = byTimeClass(games).filter((r) => r.total >= 10);
   if (tc.length >= 2) {
     const best = [...tc].sort((a, b2) => b2.score - a.score)[0];
-    out.push(`Ta cadence la plus rentable : ${best.label.toLowerCase()} (${pct(best.score)} de score).`);
+    out.push({ figure: pct(best.score), text: `de score en ${best.label.toLowerCase()} : ta cadence la plus rentable.`, tone: 'good' });
   }
   return out;
 }

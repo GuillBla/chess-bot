@@ -187,6 +187,7 @@ code, .mono { font-family: var(--mono); font-size: 0.88em; }
   display: inline-flex; align-items: center; gap: 0.4rem; justify-content: center;
   padding: 0.48rem 0.95rem; border-radius: 6px; border: 1px solid var(--border);
   background: var(--surface-2); color: var(--text); font: inherit; font-size: 0.95rem; font-weight: 500; cursor: pointer;
+  text-decoration: none;
   transition: border-color 0.15s, background 0.15s;
 }
 .btn:hover:not(:disabled) { border-color: var(--brass); }
@@ -272,4 +273,10 @@ th { background: var(--surface-2); font-weight: 600; }
   h1 { font-size: 1.65rem; }
   .content { padding-top: 1.1rem; }
   .board-frame { padding: 5px; }
+}
+
+/* Texte réservé aux lecteurs d'écran */
+.visually-hidden {
+  position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
 }
