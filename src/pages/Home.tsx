@@ -30,6 +30,13 @@ const SECTIONS: Section[] = [
     detail: 'FEN · PGN · Stockfish 17.1',
   },
   {
+    to: '/openings',
+    piece: 'wB',
+    title: 'Ouvertures',
+    text: 'Le Londres et un répertoire noir cohérent : chaque coup expliqué, à tester soi-même, puis mémorisé par répétition espacée.',
+    detail: '4 répertoires · 4 ouvertures « culture »',
+  },
+  {
     to: '/teacher',
     piece: 'wK',
     title: 'Professeur',

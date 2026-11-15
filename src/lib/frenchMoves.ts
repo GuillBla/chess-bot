@@ -36,7 +36,7 @@ export interface MoveRef {
 }
 
 /** Même position, l'autre camp au trait (« et si l'adversaire passait son tour ? »). Null si le camp au trait est en échec. */
-function nullMove(fen: string): string | null {
+export function nullMove(fen: string): string | null {
   const p = fen.split(' ');
   try {
     if (new Chess(fen).inCheck()) return null;
@@ -89,8 +89,9 @@ function tryMove(fen: string, base: string[], ply: number, san: string): { line:
  * - un coup isolé sans numéro n'est retenu que s'il est jouable depuis la position de départ.
  * Les variantes se construisent au fil du texte : on essaie d'abord la dernière ligne citée, puis la ligne principale.
  */
-export function findMoves(text: string, startFen: string, mainline: string[] = [], opts: { standalone?: boolean } = {}): MoveRef[] {
+export function findMoves(text: string, startFen: string, mainline: string[] = [], opts: { standalone?: boolean; bareDots?: boolean } = {}): MoveRef[] {
   const allowStandalone = opts.standalone ?? true;
+  const allowBareDots = opts.bareDots ?? true;
   const parts = startFen.split(' ');
   const startBlack = parts[1] === 'b';
   const startNo = parseInt(parts[5] ?? '1', 10) || 1;
@@ -116,7 +117,7 @@ export function findMoves(text: string, startFen: string, mainline: string[] = [
       ply = (parseInt(num, 10) - startNo) * 2 + (black ? 1 : 0) - (startBlack ? 1 : 0);
     } else if (continuation) {
       ply = prev!.ply + 1;
-    } else if (bareDots) {
+    } else if (bareDots && allowBareDots) {
       ply = startBlack ? 0 : 1;
     }
 

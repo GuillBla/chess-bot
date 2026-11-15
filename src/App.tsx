@@ -8,12 +8,14 @@ import { PieceIcon, type PieceCode } from './components/pieces';
 const Play = lazy(() => import('./pages/Play'));
 const Analyze = lazy(() => import('./pages/Analyze'));
 const Teacher = lazy(() => import('./pages/Teacher'));
+const Openings = lazy(() => import('./pages/Openings'));
 const Engines = lazy(() => import('./pages/Engines'));
 const Profile = lazy(() => import('./pages/Profile'));
 
 const NAV: { to: string; label: string; piece: PieceCode }[] = [
   { to: '/play', label: 'Jouer', piece: 'wN' },
   { to: '/analyze', label: 'Analyse', piece: 'wQ' },
+  { to: '/openings', label: 'Ouvertures', piece: 'wB' },
   { to: '/teacher', label: 'Professeur', piece: 'wK' },
   { to: '/engines', label: 'Moteurs', piece: 'wR' },
   { to: '/profile', label: 'Mes stats', piece: 'wP' },
@@ -59,6 +61,7 @@ export default function App() {
             <Route path="/" element={<Home />} />
             <Route path="/play" element={<Play />} />
             <Route path="/analyze" element={<Analyze />} />
+            <Route path="/openings/*" element={<Openings />} />
             <Route path="/teacher/*" element={<Teacher />} />
             <Route path="/engines" element={<Engines />} />
             <Route path="/profile" element={<Profile />} />

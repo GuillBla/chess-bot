@@ -8,7 +8,13 @@ import type { BoardPreview } from './VariationLine';
 export interface MoveContext {
   fen: string;
   mainline?: string[];
+  /** Coups isolés sans numéro acceptés s'ils sont jouables depuis `fen` (défaut : non). */
+  standalone?: boolean;
+  /** « …Fg7 » sans numéro = prochain coup noir depuis `fen` (défaut : oui). */
+  bareDots?: boolean;
 }
+
+type Ref = MoveRef & { startFen: string };
 
 export interface MoveTextProps {
   /** Texte avec `**gras**` et `*italique*`, coups en notation française. */
@@ -19,6 +25,8 @@ export interface MoveTextProps {
   mainline?: string[];
   /** Plusieurs positions de départ possibles : on garde celle qui rend le plus de coups jouables. */
   contexts?: MoveContext[];
+  /** Combiner les contextes (chaque coup pris dans le premier contexte qui l'explique) au lieu de garder le meilleur. */
+  merge?: boolean;
   /** Position simulée à afficher sur l'échiquier voisin. Absent : un petit échiquier apparaît sous le coup survolé. */
   onPreview?: (p: BoardPreview | null) => void;
 }
@@ -26,17 +34,27 @@ export interface MoveTextProps {
 const NO_LINE: string[] = [];
 
 /** Choisit la position de départ qui explique le plus de coups du texte. */
-function resolve(text: string, contexts: MoveContext[], standalone: boolean) {
-  let best = { fen: contexts[0]?.fen ?? START_FEN, refs: [] as MoveRef[] };
+function resolve(text: string, contexts: MoveContext[], standalone: boolean, merge: boolean): { key: string; refs: Ref[] } {
+  if (merge) {
+    const refs: Ref[] = [];
+    for (const c of contexts) {
+      for (const r of findMoves(text, c.fen, c.mainline ?? NO_LINE, { standalone: c.standalone ?? false, bareDots: c.bareDots ?? true })) {
+        if (!refs.some((x) => x.start < r.end && r.start < x.end)) refs.push({ ...r, startFen: c.fen });
+      }
+    }
+    refs.sort((a, b) => a.start - b.start);
+    return { key: contexts.map((c) => c.fen).join('|'), refs };
+  }
+  let best = { key: contexts[0]?.fen ?? START_FEN, refs: [] as Ref[] };
   for (const c of contexts) {
     const refs = findMoves(text, c.fen, c.mainline ?? NO_LINE, { standalone });
-    if (refs.length > best.refs.length) best = { fen: c.fen, refs };
+    if (refs.length > best.refs.length) best = { key: c.fen, refs: refs.map((r) => ({ ...r, startFen: c.fen })) };
   }
   return best;
 }
 
-function toPreview(ref: MoveRef, startFen: string): BoardPreview {
-  const label = ref.threat ? `menace ${sanToFrench(ref.move.san)}` : frenchPlyLabel(startFen, ref.ply, ref.move.san);
+function toPreview(ref: Ref): BoardPreview {
+  const label = ref.threat ? `menace ${sanToFrench(ref.move.san)}` : frenchPlyLabel(ref.startFen, ref.ply, ref.move.san);
   return { fen: ref.fen, lastMove: { from: ref.move.from, to: ref.move.to }, label, step: 0, total: 0 };
 }
 
@@ -44,11 +62,11 @@ function toPreview(ref: MoveRef, startFen: string): BoardPreview {
  * Texte d'explication dont les coups (« 23.gxh4 Td2!! ») sont survolables :
  * la position correspondante s'affiche sur l'échiquier. Un clic garde la position affichée.
  */
-export default function MoveText({ text, startFen: fixedFen, mainline = NO_LINE, contexts, onPreview }: MoveTextProps) {
-  const { fen: startFen, refs } = useMemo(
+export default function MoveText({ text, startFen: fixedFen, mainline = NO_LINE, contexts, merge = false, onPreview }: MoveTextProps) {
+  const { key: startFen, refs } = useMemo(
     // Sans position imposée (paragraphe de leçon), un coup isolé sans numéro est une idée générale : pas de lien.
-    () => resolve(text, contexts ?? [{ fen: fixedFen ?? START_FEN, mainline }], !contexts),
-    [text, contexts, fixedFen, mainline],
+    () => resolve(text, contexts ?? [{ fen: fixedFen ?? START_FEN, mainline }], !contexts, merge),
+    [text, contexts, fixedFen, mainline, merge],
   );
   const [pinned, setPinned] = useState<number | null>(null);
   const [active, setActive] = useState<number | null>(null);
@@ -79,7 +97,7 @@ export default function MoveText({ text, startFen: fixedFen, mainline = NO_LINE,
 
   const show = (i: number | null) => {
     setActive(i);
-    const p = i === null ? null : toPreview(refs[i], startFen);
+    const p = i === null ? null : toPreview(refs[i]);
     if (!popover) {
       onPreview?.(p);
       return;

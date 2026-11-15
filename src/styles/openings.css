@@ -1,0 +1,167 @@
+/* === Ouvertures : accueil, fiche d'ouverture, explorateur, entraînement ===
+   Couleurs uniquement via les tokens de base.css (clair + sombre « bois verni »). */
+
+/* ---------- Accueil ---------- */
+.op-home { display: grid; gap: 1.25rem; }
+.op-review { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+.op-review h2 { margin: 0 0 0.2rem; font-size: 1.3rem; }
+.op-review p { margin: 0; }
+.op-review.has-due { border-color: var(--brass); box-shadow: 0 0 0 2px color-mix(in srgb, var(--brass) 35%, transparent), var(--shadow); }
+.op-review a[aria-disabled='true'] { pointer-events: none; color: var(--good); }
+
+.op-method { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; }
+.op-method > div { position: relative; padding: 0.4rem 0 0 3rem; }
+.op-method h3 { margin: 0 0 0.2rem; font-size: 1.1rem; }
+.op-method p { margin: 0; color: var(--muted); font-size: 0.95rem; }
+.op-step {
+  position: absolute; left: 0; top: 0.2rem; width: 2.2rem; height: 2.2rem; border-radius: 50%;
+  display: grid; place-items: center; background: var(--walnut); color: var(--walnut-text);
+  font-family: var(--display); font-weight: 700; font-size: 1.15rem;
+}
+@media (max-width: 760px) { .op-method { grid-template-columns: 1fr; } }
+
+.op-group h2 { margin: 0.5rem 0 0.1rem; font-size: 1.45rem; }
+.op-group > p { margin: 0 0 0.75rem; max-width: 70ch; }
+.op-cards { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+.op-card { display: grid; gap: 0.45rem; align-content: start; }
+.op-card h3 { margin: 0; font-size: 1.25rem; }
+.op-card p { font-size: 0.95rem; }
+.op-card-side { display: flex; align-items: center; gap: 0.4rem; font-family: var(--mono); font-size: 0.74rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--accent); }
+.op-card-stats { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; font-size: 0.85rem; }
+
+.op-bar { position: relative; height: 6px; border-radius: 3px; background: var(--surface-2); overflow: hidden; }
+.op-bar span { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 3px; }
+.op-bar-learned { background: color-mix(in srgb, var(--brass) 70%, transparent); }
+.op-bar-mastered { background: var(--good); }
+
+/* ---------- Fiche d'une ouverture ---------- */
+.op-page {
+  display: grid; gap: 0.75rem;
+  --board-reserve: 205px;   /* bandeau + en-tête compact + boutons sous l'échiquier */
+  --board-size: clamp(260px, calc(100vh - var(--board-reserve)), 700px);
+}
+@supports (height: 100dvh) { .op-page { --board-size: clamp(260px, calc(100dvh - var(--board-reserve)), 700px); } }
+@media (max-width: 720px) { .op-page { --board-reserve: 270px; } }
+.content:has(> .openings-page .op-page) { padding-top: 0.75rem; }
+
+.op-head { display: flex; align-items: center; gap: 0.4rem 1.25rem; flex-wrap: wrap; }
+.op-back { font-size: 0.9rem; text-decoration: none; white-space: nowrap; }
+.op-head-title { display: flex; align-items: center; gap: 0.6rem; min-width: 0; }
+.op-head-title h1 { margin: 0; font-size: 1.55rem; }
+.op-head-title p { margin: 0; font-size: 0.85rem; }
+.op-tabs { margin: 0 0 0 auto; border-bottom: 0; padding-bottom: 0; }
+.op-tab-due {
+  display: inline-grid; place-items: center; min-width: 1.3rem; height: 1.3rem; margin-left: 0.35rem; padding: 0 0.3rem;
+  border-radius: 999px; background: var(--warn); color: #fff; font-size: 0.72rem; font-weight: 700;
+}
+@media (max-width: 960px) { .op-tabs { margin-left: 0; width: 100%; } }
+
+/* Comprendre */
+.op-understand { display: grid; gap: 1rem; }
+.op-understand-top { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 1rem; }
+@media (max-width: 860px) { .op-understand-top { grid-template-columns: 1fr; } }
+.op-why p { margin: 0; }
+.op-memo ol { margin: 0; padding-left: 1.3rem; display: grid; gap: 0.35rem; }
+.op-memo li::marker { color: var(--accent); font-family: var(--mono); font-weight: 600; }
+.op-book { max-width: none; }
+.op-next-step { display: flex; justify-content: center; padding: 0.5rem 0 1rem; }
+
+/* ---------- Explorateur & entraîneur : disposition ---------- */
+.op-page .board-layout.two-col { display: flex; align-items: flex-start; gap: 1.25rem; }
+.op-page .board-layout.two-col > .board-col { flex: 0 1 auto; width: calc(var(--board-size) + 20px); max-width: 100%; min-width: 0; gap: 8px; }
+.op-page .board-layout.two-col > .side-col { flex: 1 1 320px; min-width: 300px; align-content: start; }
+@media (max-width: 960px) {
+  .op-page .board-layout.two-col { flex-direction: column; align-items: stretch; }
+  .op-page .board-layout.two-col > .board-col { align-self: center; width: min(100%, calc(var(--board-size) + 20px)); }
+  .op-page .board-layout.two-col > .side-col { flex: none; min-width: 0; width: 100%; }
+}
+.op-side { gap: 0.75rem; }
+.op-side h3 { margin: 0 0 0.5rem; font-size: 1.1rem; }
+
+.op-controls { display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap; }
+.op-controls .btn { padding: 0.3rem 0.75rem; min-width: 2.6rem; }
+.op-guess { display: inline-flex; align-items: center; gap: 0.35rem; margin-left: auto; font-size: 0.9rem; cursor: pointer; }
+.op-guess input { accent-color: var(--brass); }
+
+/* Chemin des coups joués */
+.op-path { display: flex; flex-wrap: wrap; gap: 0.2rem; font-family: var(--mono); font-size: 0.82rem; }
+.op-path-move { border: 1px solid transparent; background: none; color: var(--text); font: inherit; padding: 0.1rem 0.35rem; border-radius: 4px; cursor: pointer; }
+.op-path-move:hover { background: var(--surface-2); }
+.op-path-move.current { background: var(--brass); color: var(--brass-text); }
+.op-path-move.k-mistake { color: var(--bad); }
+.op-path-move.off { color: var(--warn); font-style: italic; cursor: default; border-style: dashed; border-color: var(--warn); }
+.op-names { display: flex; flex-wrap: wrap; gap: 0.3rem; margin: 0; }
+.op-names span { font-size: 0.82rem; padding: 0.05rem 0.55rem; border-radius: 999px; background: var(--surface-2); color: var(--accent); font-weight: 600; }
+.op-names span + span::before { content: '› '; color: var(--muted); }
+
+.op-flash { margin: 0; padding: 0.45rem 0.75rem; border-radius: 6px; background: color-mix(in srgb, var(--good) 14%, transparent); color: var(--good); font-weight: 600; }
+
+.op-current-head { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; margin-bottom: 0.35rem; }
+.op-current-move { font-family: var(--display); font-size: 1.35rem; font-weight: 700; }
+.op-current-move.mono { font-family: var(--mono); font-size: 1.15rem; }
+.op-comment { margin: 0; line-height: 1.6; }
+
+/* Coups suivants */
+.op-children { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.35rem; }
+.op-child {
+  width: 100%; display: grid; grid-template-columns: auto auto 1fr; align-items: baseline; gap: 0.2rem 0.55rem;
+  text-align: left; font: inherit; color: var(--text); cursor: pointer;
+  padding: 0.45rem 0.65rem; border-radius: 6px; border: 1px solid var(--border); background: var(--surface);
+  border-left: 4px solid var(--idea);
+}
+.op-child:hover, .op-child:focus-visible { border-color: var(--brass); background: var(--surface-2); }
+.op-child.k-rep { border-left-color: var(--good); }
+.op-child.k-mistake { border-left-color: var(--bad); }
+.op-child.k-opp-mistake { border-left-color: var(--warn); }
+.op-child-move { font-weight: 600; }
+.op-child-name { font-size: 0.82rem; color: var(--accent); font-weight: 600; justify-self: end; }
+.op-child-text { grid-column: 1 / -1; font-size: 0.9rem; color: var(--muted); }
+.op-child .badge { font-size: 0.66rem; }
+.op-hidden { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.5rem 0.65rem; margin-bottom: 0.4rem; border-radius: 6px; border: 1px dashed var(--good); }
+.op-hidden p { margin: 0; }
+.op-train-row { margin-top: 0.75rem; }
+.op-offbook p { margin: 0 0 0.6rem; }
+.btn-sm { padding: 0.2rem 0.6rem; font-size: 0.85rem; }
+
+/* ---------- Entraînement ---------- */
+.op-train-intro .card { max-width: 760px; display: grid; gap: 0.6rem; }
+.op-train-intro h3 { margin: 0; }
+.op-train-stats, .op-train-scope { margin: 0; }
+.op-train-howto { margin: 0; padding-left: 1.2rem; display: grid; gap: 0.3rem; color: var(--muted); }
+.op-train-howto strong { color: var(--text); }
+
+.op-train-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.75rem; }
+.op-train-head h3 { margin: 0.1rem 0 0; font-size: 1.25rem; }
+.op-train-head small { font-family: var(--font); font-weight: 500; color: var(--muted); font-size: 0.9rem; }
+.op-train-count { white-space: nowrap; font-size: 0.82rem; }
+.op-phase { margin: 0; padding: 0.5rem 0.75rem; border-radius: 6px; font-size: 0.93rem; background: var(--surface-2); }
+.op-phase.learn { background: color-mix(in srgb, var(--idea) 12%, transparent); }
+.op-phase.recall { background: color-mix(in srgb, var(--brass) 18%, transparent); }
+
+.op-progress { height: 5px; border-radius: 3px; background: var(--surface-2); overflow: hidden; }
+.op-progress span { display: block; height: 100%; background: var(--brass); transition: width 0.3s; }
+
+.op-log {
+  display: grid; gap: 0.4rem; max-height: calc(var(--board-size) - 170px); min-height: 140px; overflow-y: auto;
+  padding: 0.6rem; border-radius: 6px; border: 1px solid var(--border); background: var(--surface);
+}
+.op-log-entry { display: grid; gap: 0.1rem; padding: 0.3rem 0.5rem; border-left: 3px solid var(--border); font-size: 0.92rem; }
+.op-log-entry.opp { border-left-color: var(--idea); }
+.op-log-entry.ours, .op-log-entry.learn { border-left-color: var(--good); }
+.op-log-entry.r-hard { border-left-color: var(--warn); }
+.op-log-entry.r-again, .op-log-entry.miss { border-left-color: var(--bad); }
+.op-log-entry.upcoming { background: color-mix(in srgb, var(--good) 10%, transparent); border-radius: 0 6px 6px 0; }
+.op-log-move { font-weight: 600; }
+.op-log-entry.miss .op-log-move { color: var(--bad); }
+.op-log-text { color: var(--muted); line-height: 1.5; }
+.op-log-entry.upcoming .op-log-text { color: var(--text); }
+.op-msg { margin: 0.2rem 0 0; padding: 0.4rem 0.6rem; border-radius: 6px; font-weight: 500; }
+.op-msg.bad { background: color-mix(in srgb, var(--bad) 13%, transparent); color: var(--bad); }
+.op-msg.info { background: color-mix(in srgb, var(--idea) 13%, transparent); color: var(--idea); }
+.op-hint-note { font-size: 0.85rem; align-self: center; }
+.op-line-done h3 { margin: 0 0 0.3rem; }
+.op-line-done p { margin: 0 0 0.6rem; }
+.op-session-end { font-weight: 600; margin-top: 0.75rem !important; }
+
+/* Pièges */
+.op-traps > p { max-width: 68ch; margin: 0 auto; }
